@@ -162,6 +162,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
     </div>
 
     <div class="card">
+      <h2>Energia consumata (kWh)</h2>
+      <div class="fuelrate" id="kwh-rate">– kWh/h</div>
+      <div class="kv" id="kwh"></div>
+      <div class="fuelnote" id="kwh-note"></div>
+    </div>
+
+    <div class="card">
       <h2>Dove c'è più densità di persone</h2>
       <div id="dens"></div>
       <p class="fuelnote" id="dens-note"></p>
@@ -1231,7 +1238,9 @@ function warmup(){
   days=0;kmSum=0;kmN=0;fuel=0;fuelAir=0;fuelFrame=0;fuelRate=0;airH=0;fuelElev=0;climbM=0;flights=0;contacts=0;sparks=[];touching=new Set();densReset();topZone=null;topPP=null;
   for(const a of agents){a.fuel=0;a.fuelAir=0;a.airH=0;a.climb=0;a.flights=0;a.hHome=0;a.hAll=0;a.t0=tau-1;a.flash=0;}
 }
-const progress=b=>REDUCED?1:Math.max(0,Math.min(1,tau-b.t0));
+// il movimento lungo le strade e la scia sono sempre animati, perché mostrano dove vanno le persone;
+// l'impostazione di sistema "riduci animazioni" (REDUCED) spegne solo gli effetti decorativi: anelli e scintille
+const progress=b=>Math.max(0,Math.min(1,tau-b.t0));
 
 /* ---------- disegno ---------- */
 const map=$('map'),mctx=map.getContext('2d');
@@ -1657,6 +1666,29 @@ function updateCO2(){
     '<span>Per persona al giorno</span><span>'+(days>0.5?ppd.toLocaleString('it-IT',{maximumFractionDigits:2})+' kg':'–')+'</span>'+
     '<span>Per persona all\'anno</span><span>'+(days>0.5?(ppd*365/1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' t':'–')+'</span>';
 }
+/* ---------- energia: litri × contenuto energetico del carburante ----------
+   1 kWh = 3,6 MJ; benzina/gasolio: 32 MJ/l ≈ 8,9 kWh/l (lo stesso valore usato per il dislivello);
+   carburante per aerei: circa 34,7 MJ/l ≈ 9,6 kWh/l. il motore trasforma in lavoro alle ruote solo il rendimento η (25%). */
+const KWH_CAR=E_L/3.6e6,KWH_AIR=34.7e6/3.6e6;
+const fmtKWh=v=>v<1e3?v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' kWh':v<1e6?(v/1e3).toLocaleString('it-IT',{maximumFractionDigits:1})+' MWh':v<1e9?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' GWh':(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' TWh';
+function updateEnergy(){
+  const dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale(),ok=days>0.5;
+  const eCar=(fuel-fuelAir)*KWH_CAR,eAir=fuelAir*KWH_AIR,tot=eCar+eAir,perDay=tot/dd*k;
+  const row=(l,v)=>'<span>'+l+'</span><span>'+v+'</span>',grp=t=>'<div class="grp">'+t+'</div>';
+  // kWh consumati in un'ora reale = potenza media in kW
+  $('kwh-rate').textContent=ok?fmtKWh(perDay/24)+'/h':'– kWh/h';
+  $('kwh').innerHTML=
+    row('Totale',fmtKWh(tot*k))+
+    row('Al giorno',ok?fmtKWh(perDay):'–')+
+    row('Potenza media',ok?(perDay/24>=1e6?(perDay/24/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' GW':(perDay/24/1e3).toLocaleString('it-IT',{maximumFractionDigits:1})+' MW'):'–')+
+    row('Per persona al giorno',ok?(tot/dd/n).toLocaleString('it-IT',{maximumFractionDigits:1})+' kWh':'–')+
+    grp('Dove va l\'energia')+
+    row('Lavoro utile alle ruote ('+ETA*100+'%)',ok?fmtKWh(eCar*ETA/dd*k)+' al giorno':'–')+
+    row('Persa in calore',ok?fmtKWh(eCar*(1-ETA)/dd*k)+' al giorno':'–')+
+    row('Per il dislivello, totale',fuel>0?(fuelElev>=0?'+':'−')+fmtKWh(Math.abs(fuelElev)*KWH_CAR*k):'–')+
+    (CANFLY?row('Per i voli, totale',fmtKWh(eAir*k)):'');
+  $('kwh-note').innerHTML='<ul><li>Energia = litri × contenuto energetico: '+KWH_CAR.toLocaleString('it-IT',{maximumFractionDigits:1})+' kWh per litro di carburante per auto (32 MJ/l ÷ 3,6 MJ/kWh)'+(CANFLY?', '+KWH_AIR.toLocaleString('it-IT',{maximumFractionDigits:1})+' kWh per litro di carburante per aerei':'')+'.</li><li>Il numero in grande sono i kWh consumati in un\'ora reale da tutta la popolazione, cioè la potenza media.</li><li>Solo il '+ETA*100+'% dell\'energia dell\'auto diventa movimento; il resto si disperde in calore.</li></ul>';
+}
 function updateFuel(){
   const md=MAPDEFS[curMap],dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale();
   // consumo reale al secondo: litri al giorno simulato diviso gli 86.400 secondi di un giorno, non dipende dalla velocità dell'animazione
@@ -1673,7 +1705,7 @@ function updateFuel(){
     row('Sul consumo in auto',fuel>0?(pct>=0?'+':'')+pct.toLocaleString('it-IT',{maximumFractionDigits:1})+'%':'–')+
     row('Salita per persona al giorno',ok?Math.round(climbM/dd/n)+' m':'–')+
     (CANFLY?grp('Voli')+row('Carburante in volo',fmtL(fuelAir*k))+row('Ore di volo',fmtH(airH*k))+row('Ore di volo al giorno',ok?fmtH(airH*k/dd):'–'):'');
-  updateCO2();
+  updateCO2();updateEnergy();
   $('fuel-note').innerHTML='<ul>'+
     '<li>Auto in piano: '+md.l100.toLocaleString('it-IT')+' l/100 km a '+md.car+' km/h di media.</li>'+
     '<li>Salita: '+(K_UP*1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' ml per metro (m·g / η·E, auto da '+CAR_KG+' kg, rendimento '+ETA*100+'%, 32 MJ/l); in discesa se ne recupera metà. Quote interpolate tra quote reali.</li>'+
@@ -1750,3 +1782,4 @@ readColors();syncUI();setMap('ny');requestAnimationFrame(loop);
 
 </body>
 </html>
+
