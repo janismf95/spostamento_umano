@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobilità umana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2ece0; --panel:#e9e1d1; --ink:#2a2418; --dim:#6f6552; --line:#d0c4ab;
+  --amber:#b87400; --gold:#8a5a00; --hot:#b03a1a; --ret:#2c6f86; --water:#b7d0d6; --air:#7a3fb0; --grid:rgba(42,36,24,.09);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#100e0a; --panel:#18150f; --ink:#ecdfc6; --dim:#8f8268; --line:#2e281d;
+    --amber:#ffb000; --gold:#f0c870; --hot:#ff6a3d; --ret:#5fb8d4; --water:#16343d; --air:#c58cff; --grid:rgba(255,176,0,.07);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#100e0a; --panel:#18150f; --ink:#ecdfc6; --dim:#8f8268; --line:#2e281d;
+  --amber:#ffb000; --gold:#f0c870; --hot:#ff6a3d; --ret:#5fb8d4; --water:#16343d; --air:#c58cff; --grid:rgba(255,176,0,.07);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding:20px 18px 40px}
+header h1{font-size:clamp(1.4rem,3vw,2rem);font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+header p{margin:0 0 18px;color:var(--dim);max-width:72ch}
+.top{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}
+@media (max-width:920px){.top{grid-template-columns:minmax(0,1fr)}}
+.mapbox{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:6px;overflow:hidden}
+#map{display:block;width:100%;aspect-ratio:1/1;cursor:crosshair;touch-action:manipulation}
+.hud{position:absolute;left:10px;top:8px;font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--gold);pointer-events:none;text-shadow:0 0 6px var(--panel)}
+.maplegend{position:absolute;right:10px;top:8px;display:flex;gap:14px;font-size:13px;pointer-events:none;text-shadow:0 0 6px var(--panel)}
+.maplegend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.hint{position:absolute;right:10px;bottom:8px;font-size:12px;color:var(--dim);pointer-events:none}
+aside{display:flex;flex-direction:column;gap:14px}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:14px}
+.card h2{font-size:1rem;margin:0 0 10px;font-weight:600}
+.eq{margin-bottom:12px}
+.eq:last-child{margin-bottom:0}
+.eq .lbl{font-size:.82rem;color:var(--dim)}
+.eq .f{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;margin-top:2px;overflow-x:auto;white-space:nowrap}
+.eq b{color:var(--amber);font-weight:600}
+.eq sup{font-size:.72em}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;margin-bottom:10px}
+.ctl label{font-size:.88rem}
+.ctl output{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--amber)}
+.ctl input{grid-column:1/-1;width:100%;accent-color:var(--amber)}
+.ctl small{grid-column:1/-1;color:var(--dim);font-size:.76rem;margin-top:-2px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:500;padding:8px 14px;border-radius:4px;border:1px solid var(--amber);background:transparent;color:var(--ink);cursor:pointer}
+button.primary{background:var(--amber);color:var(--bg)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.pn{margin-bottom:12px}
+.pnl{display:flex;justify-content:space-between;gap:10px;font-size:.88rem}
+.pnl b{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;color:var(--amber);font-weight:600}
+.bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin-top:5px}
+.bar div{height:100%;width:0;background:var(--amber);transition:width .35s ease}
+.who{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;font-size:.84rem;align-items:baseline}
+.kv span:nth-of-type(odd){color:var(--dim);text-align:left}
+.kv span:nth-of-type(even){font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;text-align:right;white-space:nowrap}
+.kv .grp{grid-column:1/-1;color:var(--ink)!important;font-weight:600;font-size:.8rem;margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+.fuelnote ul{margin:4px 0 0;padding-left:16px}
+.fuelnote li{margin:2px 0}
+.who span:nth-child(odd){color:var(--dim)}
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+@media (max-width:920px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart canvas{display:block;width:100%;height:210px}
+.chart .meta{font-size:.84rem;color:var(--dim);margin-top:8px}
+.chart .meta b{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;color:var(--amber);font-weight:600}
+.legend{display:flex;gap:14px;font-size:.78rem;color:var(--dim);margin-bottom:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-radius:2px}
+.speedbar{display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);background:var(--panel);border-radius:6px}
+.speedbar label{font-size:.9rem}
+.speedbar input{flex:1;min-width:0;accent-color:var(--amber)}
+.speedbar output{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--amber);width:36ch;flex:none;text-align:right;white-space:nowrap;overflow:hidden}
+@media (max-width:640px){.speedbar{flex-wrap:wrap}.speedbar output{width:100%}}
+.fuelrate{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-size:1.6rem;font-weight:600;color:var(--amber);margin:-2px 0 8px}
+.pop{margin-bottom:10px}
+.pop .who{margin:6px 0 4px}
+.pop small{display:block;color:var(--dim);font-size:.76rem;margin-top:4px}
+.zone{margin-bottom:10px}
+.zone small{display:block;color:var(--dim);font-size:.76rem;margin-top:3px}
+.zone.lead .pnl span{color:var(--hot);font-weight:600}
+.zone.lead .bar div{background:var(--hot)}
+.cmpcv{display:block;width:100%;height:190px}
+.cmptext{font-size:.84rem;margin-top:8px}
+.cmptext p{margin:0 0 6px}
+.cmptext b{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;color:var(--amber);font-weight:600}
+.zone.dlead .pnl span{color:var(--ret)}
+.zone.dlead .bar div{background:var(--ret)}
+.zone .pnl b{white-space:nowrap}
+.fuelnote{margin:10px 0 0;font-size:.78rem;color:var(--dim)}
+.timeinfo{margin:8px 2px 0;font-size:.82rem;color:var(--dim);max-width:80ch}
+.maps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.layers{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:.88rem}
+.layers span{color:var(--dim)}
+.layers button{padding:6px 12px}
+.layers button[aria-pressed="true"]{background:var(--amber);color:var(--bg)}
+.maps button[aria-pressed="true"]{background:var(--amber);color:var(--bg)}
+@media (prefers-reduced-motion: reduce){.bar div{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1 id="title"></h1>
+  <p id="desc"></p>
+  <div class="maps" role="group" aria-label="Mappa"><button data-map="ny" aria-pressed="true">New York</button><button data-map="london" aria-pressed="false">Londra</button><button data-map="fvg" aria-pressed="false">Friuli Venezia Giulia</button></div>
+</header>
+
+<div class="top">
+  <div class="left">
+  <div class="mapbox">
+    <canvas id="map" aria-label="Mappa degli spostamenti"></canvas>
+    <div class="hud" id="hud"></div>
+    <div class="maplegend"><span><i style="background:var(--amber)"></i>esplora</span><span><i style="background:var(--ret)"></i>torna</span><span><i style="background:var(--air)"></i>in volo</span></div>
+    <div class="hint">Tocca la mappa per seguire una persona</div>
+  </div>
+  <div class="speedbar">
+    <button class="primary" id="play">Pausa</button>
+    <label for="speed">Velocità</label>
+    <input type="range" id="speed" min="0" max="100" step="1">
+    <output id="o-speed"></output>
+  </div>
+  <div class="layers" role="group" aria-label="Livelli della mappa"><span>Mostra sulla mappa:</span><button id="show-dens" aria-pressed="false">Densità massima</button><button id="show-pump" aria-pressed="true">Distributore consigliato</button><button id="show-pp" aria-pressed="true">Consumo massimo a testa</button></div>
+  <p class="timeinfo" id="timeinfo"></p>
+  </div>
+
+  <aside>
+    <div class="card">
+      <h2 id="who-title">Persona seguita</h2>
+      <div class="pn">
+        <div class="pnl"><span>Probabilità di esplorare al prossimo passo</span><b id="pn-val">–</b></div>
+        <div class="bar"><div id="pn-bar"></div></div>
+      </div>
+      <div class="who" id="who"></div>
+    </div>
+
+    <div class="card">
+      <h2>Consumo di carburante</h2>
+      <div class="fuelrate" id="fuel-rate">0 L/s</div>
+      <div class="kv" id="fuel"></div>
+      <div class="fuelnote" id="fuel-note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Emissioni di CO₂</h2>
+      <div class="fuelrate" id="co2-rate">0 kg/s</div>
+      <div class="kv" id="co2"></div>
+      <p class="fuelnote">Calcolate dal carburante bruciato: 2,35 kg di CO₂ per litro per le auto (media tra benzina, 2,3 kg/l, e gasolio, 2,65 kg/l) e 2,52 kg per litro per il carburante degli aerei. Come per il carburante, i valori sono riferiti a tutta la popolazione, e il numero in grande è la CO₂ emessa in ogni secondo reale (al giorno ÷ 86.400), indipendente dalla velocità della simulazione.</p>
+    </div>
+
+    <div class="card">
+      <h2>Dove c'è più densità di persone</h2>
+      <div id="dens"></div>
+      <p class="fuelnote" id="dens-note"></p>
+    </div>
+
+    <div class="card">
+      <h2>Densità e consumo a confronto</h2>
+      <div class="legend"><span><i style="background:var(--amber)"></i>zone</span><span><i style="background:var(--ret)"></i>più densa</span><span><i style="background:var(--hot)"></i>consuma di più in totale</span></div>
+      <canvas id="cmp" class="cmpcv"></canvas>
+      <div id="cmp-text" class="cmptext"></div>
+    </div>
+
+    <div class="card">
+      <h2>Dove conviene un distributore</h2>
+      <div id="zones"></div>
+      <p class="fuelnote" id="zones-note"></p>
+    </div>
+
+    <div class="card">
+      <h2>Formule del modello</h2>
+      <div class="eq"><div class="lbl">Lunghezza di un salto esplorativo</div>
+        <div class="f">P(Δr) ∝ (Δr + <b id="e-dr0"></b>)<sup>−<b id="e-beta"></b></sup> · e<sup>−Δr/<b id="e-kappa"></b></sup></div></div>
+      <div class="eq"><div class="lbl">Probabilità di esplorare dopo S luoghi</div>
+        <div class="f">P<sub>nuovo</sub> = <b id="e-rho"></b> · S<sup>−<b id="e-gamma"></b></sup></div></div>
+      <div class="eq"><div class="lbl">Ritorno preferenziale, frequenza del k-esimo luogo</div>
+        <div class="f">f<sub>k</sub> ∝ k<sup>−ζ</sup>, atteso ζ ≈ 1+γ = <b id="e-zeta"></b></div></div>
+      <div class="eq"><div class="lbl">Luoghi distinti nel tempo</div>
+        <div class="f">S(t) ∝ t<sup>μ</sup>, atteso μ = 1/(1+γ) = <b id="e-mu"></b></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Parametri</h2>
+      <div class="ctl"><label for="beta">β, coda dei salti</label><output id="o-beta"></output>
+        <input type="range" id="beta" min="1.1" max="3" step="0.05"></div>
+      <div class="ctl"><label for="kappa">κ, raggio d'azione (km)</label><output id="o-kappa"></output>
+        <input type="range" id="kappa" min="1" max="80" step="1"></div>
+      <div class="ctl"><label for="dr0">Δr₀, scala minima (km)</label><output id="o-dr0"></output>
+        <input type="range" id="dr0" min="0.1" max="5" step="0.1"></div>
+      <div class="ctl"><label for="rho">ρ, voglia di esplorare</label><output id="o-rho"></output>
+        <input type="range" id="rho" min="0.05" max="1" step="0.01"></div>
+      <div class="ctl"><label for="gamma">γ, calo dell'esplorazione</label><output id="o-gamma"></output>
+        <input type="range" id="gamma" min="0" max="1" step="0.01"></div>
+      <div class="pop"><div class="pnl"><span>Popolazione</span><b id="pop-val">–</b></div>
+        <div class="who" id="pop-parts"></div>
+        <small id="pop-note"></small>
+        <small>Cambiare un parametro riavvia la simulazione.</small></div>
+      <div class="btns">
+        <button id="reset">Riavvia</button>
+        <button id="defaults">Valori reali</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="charts">
+  <div class="card chart">
+    <h2>Lunghezza dei salti</h2>
+    <div class="legend"><span><i style="background:var(--amber)"></i>esplorazioni</span><span><i style="background:var(--dim)"></i>tutti gli spostamenti</span><span><i style="background:var(--hot)"></i>formula</span></div>
+    <canvas id="c-jump"></canvas>
+    <div class="meta">Moltissimi spostamenti brevi, pochissimi lunghi. Se i punti seguono la linea tratteggiata, i salti rispettano la formula.</div>
+  </div>
+  <div class="card chart">
+    <h2>Frequenza dei luoghi (Zipf)</h2>
+    <div class="legend"><span><i style="background:var(--amber)"></i>misurato</span><span><i style="background:var(--hot)"></i>k<sup>−(1+γ)</sup></span></div>
+    <canvas id="c-zipf"></canvas>
+    <div class="meta">Il luogo più frequentato, di solito casa, prende la fetta più grande; il secondo molto meno, e così via. Se i punti seguono la linea, vale la legge di Zipf. ζ misurato: <b id="m-zeta">–</b></div>
+  </div>
+  <div class="card chart">
+    <h2>Luoghi distinti S(t)</h2>
+    <div class="legend"><span><i style="background:var(--amber)"></i>media sulle persone</span><span><i style="background:var(--hot)"></i>t<sup>1/(1+γ)</sup></span></div>
+    <canvas id="c-s"></canvas>
+    <div class="meta">I luoghi nuovi si accumulano sempre più lentamente, perché esplorare diventa raro. μ misurato: <b id="m-mu">–</b></div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const REAL={beta:1.75,kappa:20,dr0:1.5,rho:0.6,gamma:0.21,N:60,speed:4};   // N: persone simulate, ognuna rappresenta una quota della popolazione reale
+const P=Object.assign({},REAL);
+let WORLD=55;const T_MAX=4000,WARMUP=2000;   // WARMUP: passi di riscaldamento non contati all'inizio di ogni ciclo
+const PHI=(1+Math.sqrt(5))/2, GA=2*Math.PI/(PHI*PHI);
+const NB=34, RMIN=0.05, RMAX=120;
+const EDGES=[];for(let i=0;i<=NB;i++)EDGES.push(RMIN*Math.pow(RMAX/RMIN,i/NB));
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- mappe: ognuna costruisce il suo territorio e la sua rete stradale ---------- */
+function buildNewYork(){
+  /* ---------- territorio: New York ----------
+     coordinate reali convertite in km; 1 unità = 1 km */
+  const geo=(lat,lon)=>[(lon+73.95)*84.4+27.5,(40.715-lat)*111.2+27.5];
+  const LL=a=>a.map(p=>geo(p[0],p[1]));
+  // terre emerse: tutto il resto è acqua
+  const LANDS=[
+   {n:'Manhattan',pts:LL([[40.7003,-74.0150],[40.7090,-74.0185],[40.7300,-74.0130],[40.7550,-74.0090],[40.7720,-73.9950],[40.8000,-73.9750],[40.8300,-73.9560],[40.8500,-73.9480],[40.8700,-73.9300],[40.8780,-73.9230],[40.8760,-73.9110],[40.8650,-73.9150],[40.8450,-73.9280],[40.8250,-73.9330],[40.8050,-73.9300],[40.7970,-73.9280],[40.7850,-73.9400],[40.7700,-73.9480],[40.7550,-73.9600],[40.7420,-73.9710],[40.7280,-73.9730],[40.7120,-73.9760],[40.7080,-73.9980],[40.7030,-74.0090]])},
+   {n:'Bronx',pts:LL([[40.9800,-73.9150],[40.9500,-73.9050],[40.9100,-73.9130],[40.8850,-73.9180],[40.8800,-73.9180],[40.8790,-73.9060],[40.8680,-73.9110],[40.8480,-73.9240],[40.8280,-73.9290],[40.8080,-73.9250],[40.8010,-73.9120],[40.8060,-73.8850],[40.8100,-73.8700],[40.8070,-73.8500],[40.8150,-73.8250],[40.8050,-73.7950],[40.8250,-73.8000],[40.8400,-73.7850],[40.8700,-73.7900],[40.8900,-73.7700],[40.9050,-73.7500],[40.9300,-73.7100],[40.9600,-73.6800],[40.9800,-73.6000]])},
+   {n:'New Jersey',pts:LL([[40.9800,-74.4000],[40.9800,-73.9220],[40.9500,-73.9260],[40.9100,-73.9330],[40.8800,-73.9420],[40.8530,-73.9620],[40.8200,-73.9800],[40.7900,-73.9970],[40.7650,-74.0180],[40.7450,-74.0260],[40.7250,-74.0320],[40.7050,-74.0400],[40.6900,-74.0500],[40.6700,-74.0700],[40.6550,-74.0850],[40.6510,-74.1000],[40.6510,-74.1300],[40.6530,-74.1700],[40.6400,-74.2050],[40.6100,-74.2150],[40.5700,-74.2200],[40.5300,-74.2600],[40.5000,-74.2750],[40.4500,-74.3000],[40.4500,-74.4000]])},
+   {n:'Staten Island',pts:LL([[40.6450,-74.0800],[40.6420,-74.1100],[40.6400,-74.1500],[40.6380,-74.1900],[40.6100,-74.2000],[40.5700,-74.2050],[40.5400,-74.2350],[40.5050,-74.2500],[40.5000,-74.2400],[40.5300,-74.1900],[40.5500,-74.1400],[40.5700,-74.1050],[40.5950,-74.0650],[40.6200,-74.0700]])},
+   {n:'Long Island',pts:LL([[40.7800,-73.9230],[40.7700,-73.9370],[40.7550,-73.9450],[40.7450,-73.9580],[40.7300,-73.9620],[40.7150,-73.9680],[40.7050,-73.9820],[40.7000,-73.9950],[40.6900,-74.0020],[40.6750,-74.0180],[40.6550,-74.0200],[40.6300,-74.0380],[40.6080,-74.0360],[40.5950,-74.0200],[40.5800,-74.0050],[40.5730,-73.9800],[40.5750,-73.9400],[40.5550,-73.9300],[40.5650,-73.8800],[40.5780,-73.8200],[40.5850,-73.7600],[40.5900,-73.7000],[40.5900,-73.5500],[40.9000,-73.5500],[40.8500,-73.6500],[40.8300,-73.7000],[40.8000,-73.7300],[40.7750,-73.7550],[40.7950,-73.7750],[40.8000,-73.8100],[40.7950,-73.8350],[40.7750,-73.8450],[40.7650,-73.8550],[40.7800,-73.8700],[40.7850,-73.8900],[40.7800,-73.9100]])}
+  ];
+  const LAKES=[{p:geo(40.618,-73.88),r:3.4,n:'Jamaica Bay'},{p:geo(40.613,-73.83),r:3.0,n:''},{p:geo(40.675,-74.13),r:1.8,n:'Newark Bay'}].map(c=>({x:c.p[0],y:c.p[1],r:c.r,n:c.n}));
+  const PARK=LL([[40.7644,-73.9730],[40.7681,-73.9819],[40.8003,-73.9582],[40.7968,-73.9493]]);
+  // quartieri a griglia: centro, angolo, mezze dimensioni e passo (km)
+  function patch(name,land,lat0,lon0,lat1,lon1,ang,hv,su,sv,hx,hy,hr,share){
+    const a=geo(lat0,lon0),b=geo(lat1,lon1),cx=(a[0]+b[0])/2,cy=(a[1]+b[1])/2;
+    const hu=Math.hypot(b[0]-a[0],b[1]-a[1])/2;
+    const u=[Math.cos(ang),Math.sin(ang)],v=[-Math.sin(ang),Math.cos(ang)];
+    const h=geo(hx,hy);
+    return {name,land,cx,cy,u,v,GI:Math.floor(hu/su),GJ:Math.floor(hv/sv),su,sv,street:Math.min(su,sv)*0.28,hx:h[0],hy:h[1],hr,share};
+  }
+  const mA=Math.atan2(geo(40.878,-73.923)[1]-geo(40.7003,-74.015)[1],geo(40.878,-73.923)[0]-geo(40.7003,-74.015)[0]);
+  const CITIES=[
+    patch('Manhattan','Manhattan',40.7003,-74.015,40.878,-73.923,mA,2.8,0.8,0.55,40.765,-73.98,3,0.14),
+    patch('Brooklyn e Queens','Long Island',40.70,-74.05,40.70,-73.55,0,15,1.1,1.1,40.66,-73.95,5,0.48),
+    patch('Bronx','Bronx',40.88,-73.94,40.88,-73.74,0,9.5,1.1,1.1,40.85,-73.88,4,0.14),
+    patch('New Jersey','New Jersey',40.86,-74.13,40.60,-74.13,Math.PI/2,11.5,1.3,1.3,40.73,-74.10,6,0.20),
+    patch('Staten Island','Staten Island',40.58,-74.25,40.58,-74.05,0,8.5,1.3,1.3,40.585,-74.14,4,0.04)
+  ];
+  for(const c of CITIES){c.nXY=(i,j)=>[c.cx+(i-c.GI)*c.su*c.u[0]+(j-c.GJ)*c.sv*c.v[0],c.cy+(i-c.GI)*c.su*c.u[1]+(j-c.GJ)*c.sv*c.v[1]];}
+  const LABELS=[['Manhattan',40.785,-73.968],['Harlem',40.812,-73.946],['Brooklyn',40.65,-73.95],['Queens',40.725,-73.80],['Bronx',40.855,-73.87],['Staten Island',40.58,-74.15],
+    ['Jersey City',40.722,-74.07],['Hoboken',40.746,-74.04],['Newark',40.735,-74.18],['Bayonne',40.667,-74.11],['Yonkers',40.94,-73.88],['Flushing',40.762,-73.82],
+    ['Jamaica',40.70,-73.79],['Coney Island',40.58,-73.98],['Elizabeth',40.665,-74.215],['Long Island City',40.748,-73.925]].map(t=>{const p=geo(t[1],t[2]);return {n:t[0],x:p[0],y:p[1]};});
+  const WATERLABELS=[['Hudson',40.83,-73.966],['East River',40.735,-73.966],['Upper Bay',40.665,-74.045],['Lower Bay',40.55,-74.05],['Oceano Atlantico',40.52,-73.80],['Long Island Sound',40.86,-73.72]].map(t=>{const p=geo(t[1],t[2]);return {n:t[0],x:p[0],y:p[1]};});
+  const TOWNS=[];
+  // aeroporti ed eliporti di Manhattan: si vola solo tra un eliporto e un aeroporto (navette in elicottero)
+  const AIRPORTS=[['JFK',40.6413,-73.7781,'air'],['LaGuardia',40.772,-73.874,'air'],['Newark',40.6895,-74.1745,'air'],
+    ['Eliporto Downtown',40.706,-74.008,'heli'],['Eliporto E 34th St',40.744,-73.976,'heli'],['Eliporto W 30th St',40.753,-74.002,'heli']]
+    .map(a=>{const p=geo(a[1],a[2]);return {n:a[0],x:p[0],y:p[1],type:a[3]};});
+  const AIR_K=0.2,FLY_MIN=8,AIR_MIN=8,AIR_WAIT=8;   // AIR_WAIT: costo fisso di imbarco, in km equivalenti
+  const airOK=(i,j)=>AIRPORTS[i].type!==AIRPORTS[j].type;
+
+  function inPoly(x,y,pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
+  function landOf(x,y){for(const L of LANDS)if(inPoly(x,y,L.pts))return L.n;return null;}
+  const inLake=(x,y,m)=>LAKES.some(c=>Math.hypot(x-c.x,y-c.y)<c.r+(m||0));
+  const inWater=(x,y)=>!landOf(x,y)||inLake(x,y);
+  const inPark=(x,y)=>inPoly(x,y,PARK);
+  function blocked(x,y){const d=0.2;return inWater(x,y)||inWater(x+d,y)||inWater(x-d,y)||inWater(x,y+d)||inWater(x,y-d)||inPark(x,y);}
+  function cityAt(x,y){const l=landOf(x,y);return l?CITIES.find(c=>c.land===l)||null:null;}
+  const inCity=(x,y)=>!!cityAt(x,y);
+
+  /* ---------- rete stradale: ci si muove solo qui ---------- */
+  const NODES=[],ADJ=[],ROADS=[],FERRY=new Set();
+  function addNode(x,y){NODES.push({x:x,y:y,pl:!blocked(x,y),land:landOf(x,y)});ADJ.push([]);return NODES.length-1;}
+  function link(u,v){const w=Math.hypot(NODES[u].x-NODES[v].x,NODES[u].y-NODES[v].y);ADJ[u].push([v,w]);ADJ[v].push([u,w]);}
+  function wet(x0,y0,x1,y1){for(let k=0;k<=8;k++)if(inWater(x0+(x1-x0)*k/8,y0+(y1-y0)*k/8))return true;return false;}
+  for(const c of CITIES){
+    const NI=2*c.GI+1,NJ=2*c.GJ+1;c.NI=NI;c.NJ=NJ;c.ids=[];
+    for(let i=0;i<NI;i++)for(let j=0;j<NJ;j++){const q=c.nXY(i,j);
+      c.ids[i*NJ+j]=(q[0]>-1&&q[0]<WORLD+1&&q[1]>-1&&q[1]<WORLD+1&&landOf(q[0],q[1])===c.land&&!inWater(q[0],q[1]))?addNode(q[0],q[1]):-1;}
+    for(let i=0;i<NI;i++)for(let j=0;j<NJ;j++){
+      const u=c.ids[i*NJ+j];if(u<0)continue;
+      for(const d of [[1,0],[0,1]]){const i2=i+d[0],j2=j+d[1];if(i2>=NI||j2>=NJ)continue;const v=c.ids[i2*NJ+j2];if(v<0)continue;
+        if(!wet(NODES[u].x,NODES[u].y,NODES[v].x,NODES[v].y))link(u,v);}
+    }
+  }
+  // nodo di griglia più vicino a un punto, su una certa terra
+  function near(lat,lon,land){const p=geo(lat,lon);let b=-1,bd=1e9;for(const c of CITIES){if(c.land!==land)continue;for(const id of c.ids){if(id<0)continue;const d=Math.hypot(NODES[id].x-p[0],NODES[id].y-p[1]);if(d<bd){bd=d;b=id;}}}return b;}
+  const M=(a,b)=>near(a,b,'Manhattan'),LI=(a,b)=>near(a,b,'Long Island'),BX=(a,b)=>near(a,b,'Bronx'),NJ=(a,b)=>near(a,b,'New Jersey'),SI=(a,b)=>near(a,b,'Staten Island');
+  const APID=AIRPORTS.map(ap=>addNode(ap.x,ap.y));
+  const AP=n=>APID[AIRPORTS.findIndex(a=>a.n===n)];
+  const CANFLY=APID.some((a,i)=>APID.some((b,j)=>airOK(i,j)&&Math.hypot(NODES[a].x-NODES[b].x,NODES[a].y-NODES[b].y)>=AIR_MIN));
+  function road(seq,w,ferry){
+    const pts=seq.map(e=>typeof e==='number'?[NODES[e].x,NODES[e].y,e]:geo(e[0],e[1]).concat([-1]));
+    let prev=pts[0][2]>=0?pts[0][2]:addNode(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.round(L/0.8));
+      for(let k=1;k<=n;k++){
+        const id=k===n?(b[2]>=0?b[2]:addNode(b[0],b[1])):addNode(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n);
+        link(prev,id);if(ferry){FERRY.add(prev+'-'+id);FERRY.add(id+'-'+prev);}prev=id;
+      }
+    }
+    ROADS.push({w:w||1,pts:pts,ferry:!!ferry});
+  }
+  // ponti e tunnel
+  road([M(40.851,-73.946),NJ(40.853,-73.968)],1.6);           // George Washington Bridge
+  road([M(40.759,-73.998),NJ(40.765,-74.025)],1.2);           // Lincoln Tunnel
+  road([M(40.726,-74.008),NJ(40.727,-74.038)],1.2);           // Holland Tunnel
+  road([M(40.711,-74.004),LI(40.699,-73.99)],1.2);            // Brooklyn Bridge
+  road([M(40.716,-73.99),LI(40.703,-73.98)],1.2);             // Manhattan Bridge
+  road([M(40.718,-73.979),LI(40.712,-73.962)],1.2);           // Williamsburg Bridge
+  road([M(40.759,-73.962),LI(40.752,-73.940)],1.2);           // Queensboro Bridge
+  road([M(40.746,-73.974),LI(40.743,-73.952)],1.2);           // Queens-Midtown Tunnel
+  road([M(40.703,-74.013),LI(40.684,-74.005)],1.2);           // Brooklyn-Battery Tunnel
+  road([M(40.80,-73.932),LI(40.776,-73.925)],1.4);            // RFK (Triborough) verso il Queens
+  road([M(40.80,-73.932),BX(40.808,-73.918)],1.4);            // RFK verso il Bronx
+  road([M(40.835,-73.937),BX(40.836,-73.925)],1);             // ponti sull'Harlem River
+  road([M(40.858,-73.928),BX(40.86,-73.917)],1);
+  road([M(40.875,-73.914),BX(40.879,-73.905)],1);
+  road([BX(40.815,-73.828),LI(40.792,-73.823)],1.4);          // Bronx-Whitestone
+  road([BX(40.812,-73.80),LI(40.788,-73.785)],1.4);           // Throgs Neck
+  road([LI(40.612,-74.03),SI(40.602,-74.068)],1.6);           // Verrazzano-Narrows
+  road([NJ(40.656,-74.14),SI(40.636,-74.14)],1.2);            // Bayonne Bridge
+  road([NJ(40.645,-74.215),SI(40.628,-74.185)],1.2);          // Goethals
+  road([NJ(40.522,-74.268),SI(40.522,-74.235)],1.2);          // Outerbridge
+  road([SI(40.643,-74.075),M(40.701,-74.013)],1,true);        // traghetto di Staten Island
+  // superstrade
+  road([BX(40.848,-73.93),[40.842,-73.88],[40.832,-73.84],BX(40.818,-73.81)],1.4);        // Cross Bronx
+  road([BX(40.81,-73.928),[40.87,-73.912],BX(40.95,-73.89)],1.3);                       // Major Deegan
+  road([LI(40.743,-73.952),[40.737,-73.87],[40.742,-73.75],[40.755,-73.56]],1.5);       // Long Island Expressway
+  road([LI(40.72,-73.835),[40.68,-73.81],AP('JFK')],1.3);                               // Van Wyck
+  road([LI(40.765,-73.89),AP('LaGuardia')],1.1);
+  road([NJ(40.85,-73.98),[40.80,-74.05],[40.74,-74.11],AP('Newark'),[40.62,-74.235],[40.47,-74.30]],1.5);  // NJ Turnpike
+  road([SI(40.602,-74.068),[40.608,-74.13],SI(40.628,-74.185)],1.3);                    // Staten Island Expressway
+  for(const a of APID){const ap=NODES[a];let b=-1,bd=1e9;for(let k=0;k<NODES.length;k++){if(k===a||NODES[k].land!==ap.land)continue;const d=Math.hypot(NODES[k].x-ap.x,NODES[k].y-ap.y);if(d<bd){bd=d;b=k;}}if(b>=0&&bd<2)link(a,b);}
+
+  // percorsi minimi tra tutte le coppie di nodi (Dijkstra da ogni nodo)
+  const NN=NODES.length,RD=new Float32Array(NN*NN),RNX=new Int16Array(NN*NN);
+  (function(){
+    const dist=new Float64Array(NN),par=new Int32Array(NN),heap=[];
+    const push=(d,v)=>{heap.push([d,v]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;const t=heap[p];heap[p]=heap[i];heap[i]=t;i=p;}};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;const t=heap[m];heap[m]=heap[i];heap[i]=t;i=m;}}return top;};
+    for(let v=0;v<NN;v++){
+      dist.fill(Infinity);par.fill(-1);dist[v]=0;par[v]=v;heap.length=0;push(0,v);
+      while(heap.length){const [d,u]=pop();if(d>dist[u])continue;
+        for(const [w,c] of ADJ[u]){const nd=d+c;if(nd<dist[w]){dist[w]=nd;par[w]=u;push(nd,w);}}}
+      for(let u=0;u<NN;u++){RD[u*NN+v]=dist[u];RNX[u*NN+v]=par[u];}
+    }
+  })();
+  const SNAP=1.6,BK=2,BW=Math.ceil(WORLD/BK),BUCK=[];
+  for(let k=0;k<BW*BW;k++)BUCK.push([]);
+  NODES.forEach((nd,k)=>{if(nd.pl&&nd.x>=0&&nd.y>=0&&nd.x<WORLD&&nd.y<WORLD)BUCK[Math.floor(nd.y/BK)*BW+Math.floor(nd.x/BK)].push(k);});
+  function place(x,y){
+    if(x<0||x>WORLD||y<0||y>WORLD)return -1;
+    const bx=Math.floor(x/BK),by=Math.floor(y/BK);let best=-1,bd=SNAP*SNAP;
+    for(let j=by-1;j<=by+1;j++)for(let i=bx-1;i<=bx+1;i++){if(i<0||j<0||i>=BW||j>=BW)continue;
+      for(const k of BUCK[j*BW+i]){const dx=NODES[k].x-x,dy=NODES[k].y-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}}
+    return best;
+  }
+  function pathNodes(u,v){const out=[u];let k=u,g=0;while(k!==v&&g++<NN){k=RNX[k*NN+v];if(k<0)break;out.push(k);}return out;}
+  const P2=k=>[NODES[k].x,NODES[k].y];
+  function fullRoute(u,v){
+    const A=NODES[u],B=NODES[v],ground=RD[u*NN+v];
+    if(CANFLY&&Math.hypot(B.x-A.x,B.y-A.y)>FLY_MIN){
+      let best=null,bc=ground;
+      for(let i=0;i<APID.length;i++)for(let j=0;j<APID.length;j++){if(i===j||!airOK(i,j))continue;const pa=APID[i],pb=APID[j];
+        const L=Math.hypot(NODES[pb].x-NODES[pa].x,NODES[pb].y-NODES[pa].y);if(L<AIR_MIN)continue;
+        const c=RD[u*NN+pa]+RD[pb*NN+v]+L*AIR_K+AIR_WAIT;
+        if(c<bc){bc=c;best=[pa,pb];}}
+      if(best){
+        const pa=NODES[best[0]],pb=NODES[best[1]];
+        const g1=pathNodes(u,best[0]).map(P2),g2p=pathNodes(best[1],v).map(P2);
+        const dx=pb.x-pa.x,dy=pb.y-pa.y,cx=(pa.x+pb.x)/2-dy*0.18,cy=(pa.y+pb.y)/2+dx*0.18;
+        const arc=[];for(let k=1;k<=16;k++){const q=k/16;arc.push([(1-q)*(1-q)*pa.x+2*(1-q)*q*cx+q*q*pb.x,(1-q)*(1-q)*pa.y+2*(1-q)*q*cy+q*q*pb.y]);}
+        const pts=g1.concat(arc,g2p.slice(1));
+        const kinds=pts.map((_,i)=>i>=g1.length&&i<g1.length+arc.length?'a':'g');
+        return makeRoute(pts,kinds);
+      }
+    }
+    return makeRoute(pathNodes(u,v).map(P2));
+  }
+  function makeRoute(pts,kinds){
+    kinds=kinds||pts.map(()=>'g');
+    const cum=[0];
+    for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])*(kinds[i]==='a'?AIR_K:1));
+    let af=-1,at2=-1;
+    for(let i=1;i<pts.length;i++)if(kinds[i]==='a'){if(af<0)af=cum[i-1];at2=cum[i];}
+    return {pts:pts,kinds:kinds,cum:cum,len:cum[cum.length-1],fly:af>=0,airFrom:af,airTo:at2};
+  }
+  function townOf(x,y){let b='',bd=4;for(const t of LABELS){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t.n;}}return b||(landOf(x,y)||'');}
+  const TID=[];
+
+  function homePos(i,N){
+    // quote di residenti per zona, ognuna con la sua spirale aurea
+    let k=i,c=CITIES[CITIES.length-1],m=0,cnt=1;
+    for(const z of CITIES){const n=Math.max(1,Math.round(N*z.share));if(k<n){c=z;m=k;cnt=n;break;}k-=n;}
+    for(let tr=0;tr<60;tr++){
+      const r=c.hr*Math.sqrt((m+0.5)/cnt)+tr*0.2,th=m*GA+tr*0.7;
+      const p=place(c.hx+r*Math.cos(th),c.hy+r*Math.sin(th));
+      if(p>=0)return p;
+    }
+    return place(c.hx,c.hy)>=0?place(c.hx,c.hy):0;
+  }
+
+
+  function renderTerrain(){
+    const g=tc,S=W2P;
+    const poly=pts=>{g.beginPath();pts.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.closePath();};
+    g.fillStyle=C.water;g.fillRect(0,0,MW,MH);
+    g.fillStyle=C.panel;for(const L of LANDS){poly(L.pts);g.fill();}
+    g.fillStyle=C.water;for(const c of LAKES){g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();}
+    g.fillStyle=rgba(C.dim,0.2);poly(PARK);g.fill();
+    // isolati
+    g.fillStyle=rgba(C.dim,0.26);
+    for(const c of CITIES){const hw=c.street/2;
+      for(let i=0;i<c.NI-1;i++)for(let j=0;j<c.NJ-1;j++){
+        if(c.ids[i*c.NJ+j]<0||c.ids[(i+1)*c.NJ+j]<0||c.ids[i*c.NJ+j+1]<0||c.ids[(i+1)*c.NJ+j+1]<0)continue;
+        const b=c.nXY(i,j),U=c.u,V=c.v,su=c.su,sv=c.sv;
+        const pt=(a,d)=>[b[0]+a*U[0]+d*V[0],b[1]+a*U[1]+d*V[1]];
+        const ctr=pt(su/2,sv/2);if(inWater(ctr[0],ctr[1])||inPark(ctr[0],ctr[1]))continue;
+        poly([pt(hw,hw),pt(su-hw,hw),pt(su-hw,sv-hw),pt(hw,sv-hw)]);g.fill();
+      }
+    }
+    // strade principali e traghetto
+    g.lineCap='round';g.lineJoin='round';
+    for(const rd of ROADS){
+      if(rd.ferry){g.strokeStyle=rgba(C.ret,0.8);g.setLineDash([4*DPR,4*DPR]);g.lineWidth=1.3*DPR;}
+      else{g.strokeStyle=rgba(C.ink,0.32);g.setLineDash([]);g.lineWidth=Math.max(1,S(0.16*rd.w));}
+      g.beginPath();rd.pts.forEach((q,i)=>{if(i)g.lineTo(S(q[0]),S(q[1]));else g.moveTo(S(q[0]),S(q[1]));});g.stroke();
+    }
+    g.setLineDash([]);
+    // ponti e tunnel: ogni tratto di strada sopra l'acqua
+    g.strokeStyle=rgba(C.ink,0.75);g.lineWidth=Math.max(2,S(0.25));g.lineCap='butt';
+    for(let u=0;u<NN;u++)for(const [v] of ADJ[u]){if(v<u||FERRY.has(u+'-'+v))continue;const a=NODES[u],b=NODES[v];
+      if(wet(a.x,a.y,b.x,b.y)){g.beginPath();g.moveTo(S(a.x),S(a.y));g.lineTo(S(b.x),S(b.y));g.stroke();}}
+    // aeroporti
+    for(const ap of AIRPORTS){
+      if(ap.type==='heli'){g.strokeStyle=C.air;g.lineWidth=1.5*DPR;g.beginPath();g.arc(S(ap.x),S(ap.y),6*DPR,0,7);g.stroke();
+        g.fillStyle=C.air;g.font='700 '+(8*DPR)+'px Space Grotesk, sans-serif';g.textAlign='center';g.fillText('H',S(ap.x),S(ap.y)+3*DPR);continue;}
+      g.save();g.translate(S(ap.x),S(ap.y));g.fillStyle=rgba(C.ink,0.55);g.rotate(-0.5);g.fillRect(-S(1.2),-S(0.15),S(2.4),S(0.3));g.rotate(1.2);g.fillRect(-S(0.9),-S(0.13),S(1.8),S(0.26));g.restore();}
+    // nomi
+    g.textAlign='center';
+    g.fillStyle=rgba(C.ink,0.75);g.font='600 '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const t of LABELS)g.fillText(t.n,S(t.x),S(t.y));
+    g.fillStyle=C.air;g.font='600 '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const ap of AIRPORTS)if(ap.type==='air')g.fillText(ap.n,S(ap.x),S(ap.y)+S(1.1)+10*DPR);
+    g.fillStyle=C.ret;g.font='italic '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const t of WATERLABELS)g.fillText(t.n,S(t.x),S(t.y));
+    for(const c of LAKES)if(c.n)g.fillText(c.n,S(c.x),S(c.y)+4*DPR);
+    {const c=PARK.reduce((s,p)=>[s[0]+p[0]/4,s[1]+p[1]/4],[0,0]);g.fillStyle=rgba(C.dim,0.95);g.save();g.translate(S(c[0]),S(c[1]));g.rotate(mA);g.fillText('Central Park',0,3*DPR);g.restore();}
+    // scala
+    g.textAlign='left';g.strokeStyle=rgba(C.ink,0.6);g.lineWidth=1.5*DPR;g.fillStyle=rgba(C.ink,0.7);g.font=(10*DPR)+'px Space Grotesk, sans-serif';
+    const sx=S(1.5),sy=MH-S(1.5);g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+S(5),sy);g.moveTo(sx,sy-4*DPR);g.lineTo(sx,sy);g.moveTo(sx+S(5),sy-4*DPR);g.lineTo(sx+S(5),sy);g.stroke();
+    g.fillText('5 km',sx,sy-7*DPR);
+  }
+
+
+  // quote reali indicative (m s.l.m.)
+  const ELEV_PTS=[[40.75,-73.99,15],[40.705,-74.01,5],[40.785,-73.965,35],[40.81,-73.95,40],[40.85,-73.94,60],[40.87,-73.92,25],
+    [40.65,-73.95,20],[40.67,-73.98,45],[40.70,-73.99,10],[40.575,-73.98,3],[40.61,-74.03,15],[40.72,-73.80,30],[40.76,-73.83,10],[40.70,-73.79,20],[40.585,-73.82,3],[40.745,-73.93,10],[40.72,-73.66,25],
+    [40.85,-73.87,30],[40.89,-73.91,70],[40.94,-73.88,60],[40.82,-73.83,10],
+    [40.60,-74.11,125],[40.64,-74.08,20],[40.53,-74.20,15],[40.575,-74.15,40],
+    [40.735,-74.17,30],[40.72,-74.07,10],[40.745,-74.03,5],[40.85,-73.97,90],[40.67,-74.11,10],[40.66,-74.21,10],[40.80,-74.05,5],[40.90,-74.10,30],[40.55,-74.28,20],
+    [40.6413,-73.7781,4],[40.772,-73.874,6],[40.6895,-74.1745,5]];
+  // quota sul livello del mare: interpolazione tra punti di quota reale (m s.l.m.), media pesata 1/d² sui 4 più vicini
+  const ELEV=ELEV_PTS.map(p=>{const q=geo(p[0],p[1]);return [q[0],q[1],p[2]];}),ECACHE=new Map();
+  function elevAt(x,y){
+    const key=Math.round(x*20)*100000+Math.round(y*20);let z=ECACHE.get(key);if(z!==undefined)return z;
+    const near=ELEV.map(e=>[(e[0]-x)*(e[0]-x)+(e[1]-y)*(e[1]-y),e[2]]).sort((a,b)=>a[0]-b[0]).slice(0,4);
+    if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
+    ECACHE.set(key,z);return z;
+  }
+  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+}
+function buildLondra(){
+  /* ---------- territorio: Londra e dintorni ----------
+     coordinate reali convertite in km; 1 unità = 1 km; Charing Cross al centro (50,50) */
+  const geo=(lat,lon)=>[(lon+0.1278)*69.4+50,(51.5074-lat)*111.2+50];
+  const LON={x:50,y:50,r:17,step:2,street:0.45};
+  const RIVER_W=0.35;
+  const THAMES=[[51.536,-0.90],[51.57,-0.776],[51.523,-0.70],[51.505,-0.69],[51.486,-0.607],[51.433,-0.51],[51.403,-0.337],[51.425,-0.33],[51.459,-0.307],[51.483,-0.288],[51.488,-0.230],[51.466,-0.216],[51.482,-0.150],[51.487,-0.125],[51.501,-0.122],[51.509,-0.104],[51.505,-0.075],[51.502,-0.045],[51.485,-0.010],[51.505,0.005],[51.497,0.065],[51.510,0.12],[51.483,0.18],[51.465,0.26],[51.448,0.37],[51.46,0.50],[51.47,0.62]].map(p=>geo(p[0],p[1]));
+  // ponti di Londra (Kingston, Richmond, Kew, Hammersmith, Putney, Battersea, Vauxhall, Westminster, Blackfriars, Tower, Blackwall, Woolwich)
+  const LBRIDGES=[[51.412,-0.31],[51.459,-0.307],[51.483,-0.288],[51.488,-0.230],[51.466,-0.216],[51.482,-0.165],[51.487,-0.125],[51.501,-0.122],[51.509,-0.104],[51.505,-0.075],[51.505,0.005],[51.497,0.065]].map(p=>geo(p[0],p[1]));
+  const CIRCLES=[
+    {p:geo(51.417,-0.457),r:0.9,t:'lago',n:'Queen Mary'},
+    {p:geo(51.457,-0.497),r:0.7,t:'lago',n:''},
+    {p:geo(51.635,-0.040),r:0.8,t:'lago',n:''},
+    {p:geo(51.70,-0.72),r:9,t:'monti',n:'Chiltern Hills'},
+    {p:geo(51.24,-0.45),r:4,t:'monti',n:'North Downs'},
+    {p:geo(51.255,-0.30),r:3.5,t:'monti',n:''},
+    {p:geo(51.29,0.05),r:3.5,t:'monti',n:''}
+  ].map(c=>({x:c.p[0],y:c.p[1],r:c.r,t:c.t,n:c.n}));
+  const TOWNS=[['Watford',51.6565,-0.3903],['St Albans',51.7527,-0.3394],['Hatfield',51.7636,-0.2259],['Hertford',51.7960,-0.0780],
+    ['Harlow',51.7727,0.1000],['Brentwood',51.6214,0.3050],['Chelmsford',51.7356,0.4685],['Gravesend',51.430,0.3700],
+    ['Dartford',51.4462,0.2190],['Sevenoaks',51.2724,0.1909],['Redhill',51.2400,-0.1700],['Crawley',51.1092,-0.1872],
+    ['Epsom',51.3360,-0.2690],['Guildford',51.2362,-0.5704],['Woking',51.3190,-0.5580],['Windsor',51.462,-0.6044],
+    ['Slough',51.5105,-0.5950],['Maidenhead',51.515,-0.75]].map(t=>{const p=geo(t[1],t[2]);return {n:t[0],x:p[0],y:p[1]};});
+  const AIRPORTS=[['Heathrow',51.4700,-0.4543],['Gatwick',51.1537,-0.1821],['Stansted',51.8860,0.2389],['Luton',51.8747,-0.3683],['London City',51.512,0.0495]]
+    .map(a=>{const p=geo(a[1],a[2]);return {n:a[0],x:p[0],y:p[1]};});
+  const AIR_K=0.12;   // in aereo un km costa circa un ottavo del tempo che a terra
+  const FLY_MIN=25;   // si valuta il volo solo oltre 25 km in linea d'aria
+  const AIR_MIN=40;   // niente voli tra aeroporti a meno di 40 km
+
+  const inLondon=(x,y)=>Math.hypot(x-LON.x,y-LON.y)<=LON.r+0.01;
+  function segDist(px,py,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((px-a[0])*vx+(py-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const dx=a[0]+t*vx-px,dy=a[1]+t*vy-py;return Math.sqrt(dx*dx+dy*dy);}
+  function riverDist(x,y){let m=1e9;for(let i=1;i<THAMES.length;i++){const d=segDist(x,y,THAMES[i-1],THAMES[i]);if(d<m)m=d;}return m;}
+  const inRiver=(x,y,m)=>riverDist(x,y)<RIVER_W+(m||0);
+  function inCircle(x,y,m){for(const c of CIRCLES)if((x-c.x)*(x-c.x)+(y-c.y)*(y-c.y)<(c.r+(m||0))*(c.r+(m||0)))return true;return false;}
+
+  /* ---------- rete stradale: ci si muove solo qui ---------- */
+  const NODES=[],ADJ=[],ROADS=[];
+  function addNode(x,y){NODES.push({x:x,y:y,pl:!inRiver(x,y,0.25)&&!inCircle(x,y,0.3)});ADJ.push([]);return NODES.length-1;}
+  function link(u,v){const w=Math.hypot(NODES[u].x-NODES[v].x,NODES[u].y-NODES[v].y);ADJ[u].push([v,w]);ADJ[v].push([u,w]);}
+  function wet(x0,y0,x1,y1){for(let k=0;k<=8;k++)if(inRiver(x0+(x1-x0)*k/8,y0+(y1-y0)*k/8,0.05))return true;return false;}
+  // griglia di Londra dentro un cerchio di 17 km
+  const GK=Math.floor(LON.r/LON.step),GN=2*GK+1;
+  const nX=i=>LON.x+(i-GK)*LON.step,nY=j=>LON.y+(j-GK)*LON.step,nid=(i,j)=>i*GN+j;
+  const gridId=[];
+  for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){const x=nX(i),y=nY(j);gridId[nid(i,j)]=(inLondon(x,y)&&!inRiver(x,y,0.25)&&!inCircle(x,y,0.3))?addNode(x,y):-1;}
+  const nearBridge=(x,y)=>LBRIDGES.some(b=>Math.hypot(b[0]-x,b[1]-y)<1.3);
+  for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){
+    const u=gridId[nid(i,j)];if(u<0)continue;
+    for(const d of [[1,0],[0,1]]){
+      const i2=i+d[0],j2=j+d[1];if(i2>=GN||j2>=GN)continue;const v=gridId[nid(i2,j2)];if(v<0)continue;
+      const x0=nX(i),y0=nY(j),x1=nX(i2),y1=nY(j2);
+      if(!wet(x0,y0,x1,y1)||nearBridge((x0+x1)/2,(y0+y1)/2))link(u,v);
+    }
+  }
+  function nl(x,y){let b=-1,bd=1e9;for(let k=0;k<gridId.length;k++){const id=gridId[k];if(id<0)continue;const d=Math.hypot(NODES[id].x-x,NODES[id].y-y);if(d<bd){bd=d;b=id;}}return b;}
+  // paesi: piazza centrale con quattro vie
+  const TID=TOWNS.map(v=>{
+    const c=addNode(v.x,v.y);
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){let prev=c;for(let k=1;k<=2;k++){const id=addNode(v.x+d[0]*0.6*k,v.y+d[1]*0.6*k);link(prev,id);prev=id;}
+      ROADS.push({w:0.7,pts:[[v.x,v.y],[v.x+d[0]*1.2,v.y+d[1]*1.2]]});}
+    return c;
+  });
+  const T=n=>TID[TOWNS.findIndex(t=>t.n===n)];
+  const APID=AIRPORTS.map(ap=>addNode(ap.x,ap.y));
+  const AP=n=>APID[AIRPORTS.findIndex(a=>a.n===n)];
+  // strade: i numeri sono nodi esistenti, le coppie [lat,lon] sono punti di passaggio
+  function road(seq,w){
+    const pts=seq.map(e=>typeof e==='number'?[NODES[e].x,NODES[e].y,e]:geo(e[0],e[1]).concat([-1]));
+    let prev=pts[0][2]>=0?pts[0][2]:addNode(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.round(L/0.8));
+      for(let k=1;k<=n;k++){
+        const id=k===n?(b[2]>=0?b[2]:addNode(b[0],b[1])):addNode(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n);
+        link(prev,id);prev=id;
+      }
+    }
+    ROADS.push({w:w||1,pts:pts});
+  }
+  const g2=(x,y)=>nl(x,y);
+  // London City: collegato alle strade vicine
+  {const a=AP('London City');const ap=NODES[a];link(a,nl(ap.x,ap.y));}
+  // M25: anello di svincoli
+  const M25=[[51.475,0.259],[51.39,0.17],[51.29,0.15],[51.255,-0.05],[51.265,-0.14],[51.27,-0.22],[51.30,-0.33],[51.32,-0.45],[51.38,-0.52],[51.425,-0.535],[51.46,-0.52],[51.49,-0.50],[51.56,-0.50],[51.62,-0.48],[51.70,-0.40],[51.72,-0.36],[51.70,-0.22],[51.68,-0.05],[51.67,0.02],[51.66,0.10],[51.61,0.25],[51.57,0.30],[51.49,0.28]];
+  const J=M25.map(p=>{const q=geo(p[0],p[1]);return addNode(q[0],q[1]);});
+  const J2=(q=>addNode(q[0],q[1]))(geo(51.43,0.24));   // svincolo A2, sponda sud
+  road([J[0],J2].concat(J.slice(1),[J[0]]),1.6);
+  // radiali e collegamenti
+  road([g2(40,37),J[15],T('St Albans'),AP('Luton')],1.4);            // M1
+  road([g2(38,40),T('Watford'),J[14]],1);                              // A41
+  road([g2(46,35),J[16],T('Hatfield')],1.4);                          // A1(M)
+  road([g2(54,35),J[17],T('Hertford')],1);                            // A10
+  road([g2(58,36),J[19],T('Harlow'),AP('Stansted')],1.4);             // M11
+  road([g2(64,42),J[20],T('Brentwood'),T('Chelmsford')],1.2);         // A12
+  road([g2(66,48),J[22]],1.2);                                        // A13
+  road([g2(64,57),T('Dartford'),J2],1.2);                           // A2
+  road([T('Dartford'),T('Gravesend')],1);
+  road([g2(60,62),J[1]],1);                                           // A20
+  road([g2(56,65),J[2],T('Sevenoaks')],1);                            // A21
+  road([g2(50,67),J[4],T('Redhill'),AP('Gatwick'),T('Crawley')],1.4); // A23/M23
+  road([g2(44,65),T('Epsom'),J[6]],1);                                // A24
+  road([g2(40,62),J[7],T('Guildford')],1.2);                          // A3
+  road([g2(38,62),[51.39,-0.37],J[8],T('Woking')],1.4);                             // M3
+  road([T('Woking'),T('Guildford')],1);
+  road([g2(34,52),J[11],T('Slough'),T('Maidenhead')],1.4);            // M4
+  road([g2(35,55),AP('Heathrow'),J[10]],1.2);
+  road([AP('Heathrow'),J[11]],1);
+  road([T('Slough'),T('Windsor')],1);
+  road([g2(34,46),J[12],[51.60,-0.75]],1.4);                          // M40
+  road([T('St Albans'),T('Hatfield')],1);
+  road([T('Watford'),T('St Albans')],1);
+  road([T('Hertford'),T('Harlow')],1);
+
+  // percorsi minimi tra tutte le coppie di nodi (Dijkstra da ogni nodo)
+  const NN=NODES.length,RD=new Float32Array(NN*NN),RNX=new Int16Array(NN*NN);
+  (function(){
+    const dist=new Float64Array(NN),par=new Int32Array(NN),heap=[];
+    const push=(d,v)=>{heap.push([d,v]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;const t=heap[p];heap[p]=heap[i];heap[i]=t;i=p;}};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;const t=heap[m];heap[m]=heap[i];heap[i]=t;i=m;}}return top;};
+    for(let v=0;v<NN;v++){
+      dist.fill(Infinity);par.fill(-1);dist[v]=0;par[v]=v;heap.length=0;push(0,v);
+      while(heap.length){const [d,u]=pop();if(d>dist[u])continue;
+        for(const [w,c] of ADJ[u]){const nd=d+c;if(nd<dist[w]){dist[w]=nd;par[w]=u;push(nd,w);}}}
+      for(let u=0;u<NN;u++){RD[u*NN+v]=dist[u];RNX[u*NN+v]=par[u];}
+    }
+  })();
+  // aggancio dei luoghi al nodo stradale più vicino (entro 1.6 km)
+  const SNAP=1.6,BK=2,BW=Math.ceil(WORLD/BK),BUCK=[];
+  for(let k=0;k<BW*BW;k++)BUCK.push([]);
+  NODES.forEach((nd,k)=>{if(nd.pl&&nd.x>=0&&nd.y>=0&&nd.x<WORLD&&nd.y<WORLD)BUCK[Math.floor(nd.y/BK)*BW+Math.floor(nd.x/BK)].push(k);});
+  function place(x,y){
+    if(x<0||x>WORLD||y<0||y>WORLD)return -1;
+    const bx=Math.floor(x/BK),by=Math.floor(y/BK);let best=-1,bd=SNAP*SNAP;
+    for(let j=by-1;j<=by+1;j++)for(let i=bx-1;i<=bx+1;i++){if(i<0||j<0||i>=BW||j>=BW)continue;
+      for(const k of BUCK[j*BW+i]){const dx=NODES[k].x-x,dy=NODES[k].y-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}}
+    return best;
+  }
+  function pathNodes(u,v){const out=[u];let k=u,g=0;while(k!==v&&g++<NN){k=RNX[k*NN+v];if(k<0)break;out.push(k);}return out;}
+  const P2=k=>[NODES[k].x,NODES[k].y];
+  function fullRoute(u,v){
+    const A=NODES[u],B=NODES[v],ground=RD[u*NN+v];
+    if(Math.hypot(B.x-A.x,B.y-A.y)>FLY_MIN){
+      let best=null,bc=ground;
+      for(const pa of APID)for(const pb of APID){if(pa===pb)continue;
+        const L=Math.hypot(NODES[pb].x-NODES[pa].x,NODES[pb].y-NODES[pa].y);if(L<AIR_MIN)continue;
+        const c=RD[u*NN+pa]+RD[pb*NN+v]+L*AIR_K;
+        if(c<bc){bc=c;best=[pa,pb];}}
+      if(best){
+        const pa=NODES[best[0]],pb=NODES[best[1]];
+        const g1=pathNodes(u,best[0]).map(P2),g2p=pathNodes(best[1],v).map(P2);
+        const dx=pb.x-pa.x,dy=pb.y-pa.y,cx=(pa.x+pb.x)/2-dy*0.18,cy=(pa.y+pb.y)/2+dx*0.18;
+        const arc=[];for(let k=1;k<=16;k++){const q=k/16;arc.push([(1-q)*(1-q)*pa.x+2*(1-q)*q*cx+q*q*pb.x,(1-q)*(1-q)*pa.y+2*(1-q)*q*cy+q*q*pb.y]);}
+        const pts=g1.concat(arc,g2p.slice(1));
+        const kinds=pts.map((_,i)=>i>=g1.length&&i<g1.length+arc.length?'a':'g');
+        return makeRoute(pts,kinds);
+      }
+    }
+    return makeRoute(pathNodes(u,v).map(P2));
+  }
+  function makeRoute(pts,kinds){
+    kinds=kinds||pts.map(()=>'g');
+    const cum=[0];
+    for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])*(kinds[i]==='a'?AIR_K:1));
+    let af=-1,at2=-1;
+    for(let i=1;i<pts.length;i++)if(kinds[i]==='a'){if(af<0)af=cum[i-1];at2=cum[i];}
+    return {pts:pts,kinds:kinds,cum:cum,len:cum[cum.length-1],fly:af>=0,airFrom:af,airTo:at2};
+  }
+  function townOf(x,y){if(inLondon(x,y))return 'Londra';let b='',bd=3;for(const t of TOWNS){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t.n;}}return b;}
+
+  const CANFLY=APID.length>1;
+  function homePos(i,N){
+    const nc=Math.max(1,Math.round(N*0.78));
+    let cx,cy,R,m,cnt;
+    if(i<nc){cx=LON.x;cy=LON.y;R=15;m=i;cnt=nc;}
+    else{const V=TOWNS.length,k=i-nc;const v=TOWNS[k%V];cx=v.x;cy=v.y;R=1.2;m=Math.floor(k/V);cnt=Math.max(1,Math.ceil((N-nc)/V));}
+    for(let tr=0;tr<40;tr++){
+      const r=R*Math.sqrt((m+0.5)/cnt)+tr*0.25,th=m*GA+tr*0.7;
+      const p=place(cx+r*Math.cos(th),cy+r*Math.sin(th));
+      if(p>=0)return p;
+    }
+    return TID[0];
+  }
+
+
+  function renderTerrain(){
+    const g=tc,S=W2P;
+    g.fillStyle=C.panel;g.fillRect(0,0,MW,MH);
+    // rilievi: curve di livello
+    for(const c of CIRCLES){
+      if(c.t!=='monti')continue;
+      g.fillStyle=rgba(C.dim,0.08);g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();
+      g.strokeStyle=rgba(C.dim,0.35);g.lineWidth=1*DPR;
+      for(let k=1;k<=4;k++){g.beginPath();
+        for(let a=0;a<=64;a++){const th=a/64*2*Math.PI;const rr=c.r*k/4*(1+0.08*Math.sin(3*th+k));const x=S(c.x+rr*Math.cos(th)),y=S(c.y+rr*Math.sin(th));a?g.lineTo(x,y):g.moveTo(x,y);}
+        g.stroke();}
+    }
+    // area di Londra e isolati
+    g.fillStyle=rgba(C.dim,0.07);g.beginPath();g.arc(S(LON.x),S(LON.y),S(LON.r+0.8),0,7);g.fill();
+    g.fillStyle=rgba(C.dim,0.24);
+    const st=LON.step,hw=LON.street/2;
+    for(let i=0;i<GN-1;i++)for(let j=0;j<GN-1;j++){
+      if(gridId[nid(i,j)]<0||gridId[nid(i+1,j)]<0||gridId[nid(i,j+1)]<0||gridId[nid(i+1,j+1)]<0)continue;
+      const x0=nX(i)+hw,y0=nY(j)+hw,w=st-LON.street;
+      let w2=false;for(let u=0;u<=4&&!w2;u++)for(let v=0;v<=4&&!w2;v++)if(inRiver(x0+w*u/4,y0+w*v/4,0.1)||inCircle(x0+w*u/4,y0+w*v/4,0.1))w2=true;
+      if(!w2)g.fillRect(S(x0),S(y0),S(w),S(w));
+    }
+    // laghi e bacini
+    for(const c of CIRCLES){if(c.t!=='lago')continue;g.fillStyle=C.water;g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();}
+    // Tamigi
+    g.strokeStyle=C.water;g.lineWidth=S(2*RIVER_W);g.lineCap='round';g.lineJoin='round';
+    g.beginPath();THAMES.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.stroke();
+    // strade
+    g.lineCap='round';g.lineJoin='round';
+    for(const rd of ROADS){g.strokeStyle=rgba(C.ink,0.3);g.lineWidth=Math.max(1,S(0.22*rd.w));g.beginPath();rd.pts.forEach((q,i)=>{if(i)g.lineTo(S(q[0]),S(q[1]));else g.moveTo(S(q[0]),S(q[1]));});g.stroke();}
+    // ponti: ogni tratto di strada che passa sull'acqua
+    g.strokeStyle=rgba(C.ink,0.75);g.lineWidth=Math.max(2,S(0.35));g.lineCap='butt';
+    for(let u=0;u<NN;u++)for(const [v] of ADJ[u]){if(v<u)continue;const a=NODES[u],b=NODES[v];
+      if(wet(a.x,a.y,b.x,b.y)){g.beginPath();g.moveTo(S(a.x),S(a.y));g.lineTo(S(b.x),S(b.y));g.stroke();}}
+    // paesi
+    TOWNS.forEach((v,vi)=>{
+      const r=rng(7+vi*31);g.fillStyle=rgba(C.dim,0.5);
+      for(let k=0;k<14;k++){const rr=1.4*Math.sqrt(r()),th=r()*2*Math.PI;const x=v.x+rr*Math.cos(th),y=v.y+rr*Math.sin(th);
+        if(inRiver(x,y,0.2)||inCircle(x,y,0.2)||Math.abs(x-v.x)<0.3||Math.abs(y-v.y)<0.3)continue;const sz=0.25+r()*0.15;g.fillRect(S(x-sz/2),S(y-sz/2),S(sz),S(sz));}
+    });
+    // aeroporti: due piste incrociate
+    for(const ap of AIRPORTS){
+      g.save();g.translate(S(ap.x),S(ap.y));g.fillStyle=rgba(C.ink,0.55);
+      g.rotate(-0.1);g.fillRect(-S(1.6),-S(0.2),S(3.2),S(0.4));
+      g.rotate(1.0);g.fillRect(-S(1.1),-S(0.17),S(2.2),S(0.34));
+      g.restore();
+    }
+    // nomi
+    g.textAlign='center';
+    g.fillStyle=rgba(C.ink,0.75);g.font='600 '+(13*DPR)+'px Space Grotesk, sans-serif';
+    g.fillText('Londra',S(LON.x),S(LON.y-LON.r)-8*DPR);
+    g.font=(10*DPR)+'px Space Grotesk, sans-serif';g.fillStyle=rgba(C.ink,0.65);
+    for(const t of TOWNS)g.fillText(t.n,S(t.x),S(t.y)+S(1.4)+10*DPR);
+    g.fillStyle=C.air;g.font='600 '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const ap of AIRPORTS)g.fillText(ap.n,S(ap.x),S(ap.y)-S(1.4)-5*DPR);
+    g.fillStyle=rgba(C.dim,0.9);g.font='italic '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const c of CIRCLES)if(c.n)g.fillText(c.n,S(c.x),S(c.y)+(c.t==='lago'?S(c.r)+10*DPR:4*DPR));
+    {const p=geo(51.45,0.42);g.fillStyle=C.ret;g.fillText('Tamigi',S(p[0]),S(p[1])-6*DPR);}
+    // scala
+    g.textAlign='left';g.strokeStyle=rgba(C.ink,0.6);g.lineWidth=1.5*DPR;g.fillStyle=rgba(C.ink,0.65);g.font=(10*DPR)+'px Space Grotesk, sans-serif';
+    const sx=S(2),sy=MH-S(2);g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+S(10),sy);g.moveTo(sx,sy-4*DPR);g.lineTo(sx,sy);g.moveTo(sx+S(10),sy-4*DPR);g.lineTo(sx+S(10),sy);g.stroke();
+    g.fillText('10 km',sx,sy-7*DPR);
+  }
+
+
+  // quote reali indicative (m s.l.m.)
+  const ELEV_PTS=[[51.507,-0.128,15],[51.56,-0.17,130],[51.42,-0.07,110],[51.49,0.10,5],[51.46,-0.30,15],[51.65,-0.20,100],[51.37,-0.10,60],[51.58,-0.34,80],[51.58,0.18,20],[51.53,0.05,10],[51.45,0.0,40],
+    [51.6565,-0.3903,80],[51.7527,-0.3394,120],[51.7636,-0.2259,80],[51.7960,-0.0780,40],[51.7727,0.10,70],[51.6214,0.305,100],[51.7356,0.4685,30],[51.43,0.37,20],[51.4462,0.219,20],
+    [51.2724,0.1909,160],[51.24,-0.17,70],[51.1092,-0.1872,80],[51.336,-0.269,70],[51.2362,-0.5704,40],[51.319,-0.558,30],[51.462,-0.6044,30],[51.5105,-0.595,30],[51.515,-0.75,30],
+    [51.70,-0.72,250],[51.24,-0.45,200],[51.255,-0.30,180],[51.29,0.05,200],
+    [51.47,-0.4543,25],[51.1537,-0.1821,62],[51.886,0.2389,106],[51.8747,-0.3683,160],[51.512,0.0495,5]];
+  // quota sul livello del mare: interpolazione tra punti di quota reale (m s.l.m.), media pesata 1/d² sui 4 più vicini
+  const ELEV=ELEV_PTS.map(p=>{const q=geo(p[0],p[1]);return [q[0],q[1],p[2]];}),ECACHE=new Map();
+  function elevAt(x,y){
+    const key=Math.round(x*20)*100000+Math.round(y*20);let z=ECACHE.get(key);if(z!==undefined)return z;
+    const near=ELEV.map(e=>[(e[0]-x)*(e[0]-x)+(e[1]-y)*(e[1]-y),e[2]]).sort((a,b)=>a[0]-b[0]).slice(0,4);
+    if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
+    ECACHE.set(key,z);return z;
+  }
+  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+}
+function buildFriuli(){
+  /* ---------- territorio: Friuli Venezia Giulia ----------
+     coordinate reali convertite in km; 1 unità = 1 km */
+  const geo=(lat,lon)=>[(lon-13.11)*76.5+62.5,(46.10-lat)*111.2+62.5];
+  const CITIES=[['Trieste',45.655,13.785,3.2,0.6,0.17],['Udine',46.0637,13.2353,4,0.8,0.08],['Pordenone',45.9564,12.6605,3,0.7,0.045],['Gorizia',45.94,13.63,2.2,0.6,0.03]]
+    .map(c=>{const p=geo(c[1],c[2]);return {name:c[0],x:p[0],y:p[1],r:c[3],step:c[4],street:0.2,share:c[5]};});
+  const RIVER_W=0.2;
+  const RIVERS=[
+    {n:'Tagliamento',pts:[[46.45,12.45],[46.41,12.58],[46.40,12.70],[46.40,12.80],[46.400,12.92],[46.39,13.00],[46.375,13.07],[46.36,13.11],[46.33,13.12],[46.29,13.10],[46.26,13.06],[46.22,13.00],[46.18,12.95],[46.12,12.93],[46.05,12.92],[45.96,12.90],[45.86,12.96],[45.78,13.00],[45.70,13.07],[45.645,13.10]]},
+    {n:'Fella',pts:[[46.55,13.33],[46.506,13.285],[46.46,13.295],[46.415,13.29],[46.395,13.25],[46.395,13.205],[46.38,13.16],[46.36,13.11]]},
+    {n:'Isonzo',pts:[[46.02,13.66],[45.96,13.615],[45.92,13.56],[45.885,13.515],[45.82,13.50],[45.77,13.53],[45.72,13.545]]}
+  ].map(r=>({n:r.n,pts:r.pts.map(p=>geo(p[0],p[1]))}));
+  // mare Adriatico: costa da ovest a est, poi chiusura sul bordo inferiore
+  const SEA=[[45.60,12.20],[45.62,12.70],[45.635,12.95],[45.645,13.10],[45.66,13.16],[45.675,13.30],[45.675,13.42],[45.715,13.53],[45.765,13.585],[45.76,13.64],[45.70,13.705],[45.66,13.752],[45.62,13.752],[45.59,13.79],[45.585,13.85],[45.50,13.85],[45.50,12.20]].map(p=>geo(p[0],p[1]));
+  const CIRCLES=[
+    {p:geo(46.33,13.07),r:1.0,t:'lago',n:'Cavazzo'},
+    {p:geo(46.19,12.56),r:0.9,t:'lago',n:'Barcis'},
+    {p:geo(46.355,13.05),r:2,t:'monti',n:''},
+    {p:geo(46.30,13.20),r:3,t:'monti',n:'Chiampon'},
+    {p:geo(46.32,13.30),r:4,t:'monti',n:'Musi'},
+    {p:geo(46.47,13.20),r:4,t:'monti',n:'Sernio'},
+    {p:geo(46.36,13.44),r:5,t:'monti',n:'Canin'},
+    {p:geo(46.44,13.43),r:4,t:'monti',n:'Montasio'},
+    {p:geo(46.61,12.90),r:5,t:'monti',n:'Coglians'},
+    {p:geo(46.37,12.98),r:2.2,t:'monti',n:''},
+    {p:geo(46.33,12.55),r:7,t:'monti',n:'Dolomiti Friulane'},
+    {p:geo(46.12,12.47),r:4,t:'monti',n:'M. Cavallo'},
+    {p:geo(46.25,12.67),r:3,t:'monti',n:'Raut'},
+    {p:geo(46.21,13.53),r:3,t:'monti',n:'Matajur'}
+  ].map(c=>({x:c.p[0],y:c.p[1],r:c.r,t:c.t,n:c.n}));
+  const TOWNS=[['Moggio Udinese',46.4083,13.2006],['Gemona del Friuli',46.2756,13.1389],['Tolmezzo',46.3986,13.0157],['Venzone',46.3317,13.1386],
+    ['Chiusaforte',46.4069,13.3125],['Pontebba',46.5058,13.3058],['Tarvisio',46.5050,13.5786],['Amaro',46.381,13.0930],
+    ['Villa Santina',46.4136,12.9228],['Arta Terme',46.4808,13.0158],['Paluzza',46.532,13.015],['Ampezzo',46.415,12.797],
+    ['Forni di Sopra',46.423,12.583],['Forni Avoltri',46.585,12.776],['Sappada',46.567,12.685],
+    ['Osoppo',46.2556,13.0806],['Artegna',46.2417,13.1531],['Buja',46.2120,13.1170],['Tarcento',46.2128,13.2153],['Tricesimo',46.1594,13.2128],
+    ['San Daniele',46.1592,13.0115],['Fagagna',46.1131,13.0844],['Spilimbergo',46.111,12.900],['Maniago',46.169,12.707],['Aviano',46.07,12.59],
+    ['Sacile',45.954,12.502],['San Vito al T.',45.915,12.857],['Codroipo',45.9614,12.9772],['Latisana',45.78,13.02],['Lignano',45.685,13.125],
+    ['Cividale',46.0939,13.4322],['Manzano',45.99,13.38],['Cormons',45.957,13.47],['Gradisca',45.895,13.49],['Palmanova',45.9056,13.3100],
+    ['Cervignano',45.823,13.336],['Aquileia',45.769,13.37],['Grado',45.692,13.39],['Monfalcone',45.81,13.533],['Opicina',45.687,13.787]]
+    .map(t=>{const p=geo(t[1],t[2]);return {n:t[0],x:p[0],y:p[1]};});
+  // Trieste Airport (Ronchi) più gli aeroporti di aviazione generale di Udine-Campoformido e di Gorizia
+  const AIRPORTS=[['Trieste Airport',45.8275,13.4722],['Udine Campoformido',46.0322,13.1868],['Aeroporto Gorizia',45.9066,13.5993]].map(a=>{const p=geo(a[1],a[2]);return {n:a[0],x:p[0],y:p[1]};});
+  const AIR_K=0.12,FLY_MIN=20,AIR_MIN=25,AIR_WAIT=10;   // aerei leggeri: tratte brevi, ma con un costo fisso di imbarco
+
+  function cityAt(x,y){for(const c of CITIES)if(Math.hypot(x-c.x,y-c.y)<=c.r+0.01)return c;return null;}
+  const inCity=(x,y)=>!!cityAt(x,y);
+  function segDist(px,py,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((px-a[0])*vx+(py-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const dx=a[0]+t*vx-px,dy=a[1]+t*vy-py;return Math.sqrt(dx*dx+dy*dy);}
+  function riverDist(x,y){let m=1e9;for(const r of RIVERS)for(let i=1;i<r.pts.length;i++){const d=segDist(x,y,r.pts[i-1],r.pts[i]);if(d<m)m=d;}return m;}
+  const inRiver=(x,y,m)=>riverDist(x,y)<RIVER_W+(m||0);
+  function inSea(x,y){let c=false;for(let i=0,j=SEA.length-1;i<SEA.length;j=i++){const a=SEA[i],b=SEA[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
+  function seaDist(x,y){let m=1e9;for(let i=1;i<SEA.length;i++){const d=segDist(x,y,SEA[i-1],SEA[i]);if(d<m)m=d;}return inSea(x,y)?-m:m;}
+  function inCircle(x,y,m){for(const c of CIRCLES)if((x-c.x)*(x-c.x)+(y-c.y)*(y-c.y)<(c.r+(m||0))*(c.r+(m||0)))return true;return false;}
+  const blocked=(x,y)=>inRiver(x,y,0.25)||inCircle(x,y,0.3)||seaDist(x,y)<0.2;
+
+  /* ---------- rete stradale: ci si muove solo qui ---------- */
+  const NODES=[],ADJ=[],ROADS=[];
+  function addNode(x,y){NODES.push({x:x,y:y,pl:!blocked(x,y)});ADJ.push([]);return NODES.length-1;}
+  function link(u,v){const w=Math.hypot(NODES[u].x-NODES[v].x,NODES[u].y-NODES[v].y);ADJ[u].push([v,w]);ADJ[v].push([u,w]);}
+  function wet(x0,y0,x1,y1){for(let k=0;k<=8;k++)if(inRiver(x0+(x1-x0)*k/8,y0+(y1-y0)*k/8,0.05))return true;return false;}
+  // griglie delle città (con ponti in città dove passa un fiume)
+  for(const c of CITIES){
+    c.GK=Math.floor(c.r/c.step);c.GN=2*c.GK+1;c.ids=[];
+    c.nX=i=>c.x+(i-c.GK)*c.step;c.nY=j=>c.y+(j-c.GK)*c.step;
+    for(let i=0;i<c.GN;i++)for(let j=0;j<c.GN;j++){const x=c.nX(i),y=c.nY(j);
+      c.ids[i*c.GN+j]=(Math.hypot(x-c.x,y-c.y)<=c.r&&!blocked(x,y))?addNode(x,y):-1;}
+    for(let i=0;i<c.GN;i++)for(let j=0;j<c.GN;j++){
+      const u=c.ids[i*c.GN+j];if(u<0)continue;
+      if(i+1<c.GN&&c.ids[(i+1)*c.GN+j]>=0)link(u,c.ids[(i+1)*c.GN+j]);
+      if(j+1<c.GN&&c.ids[i*c.GN+j+1]>=0)link(u,c.ids[i*c.GN+j+1]);
+    }
+  }
+  const CN=(name,lat,lon)=>{const c=CITIES.find(k=>k.name===name),p=geo(lat,lon);let b=-1,bd=1e9;
+    for(const id of c.ids){if(id<0)continue;const d=Math.hypot(NODES[id].x-p[0],NODES[id].y-p[1]);if(d<bd){bd=d;b=id;}}return b;};
+  // paesi: piazza centrale con quattro vie
+  const TID=TOWNS.map(v=>{
+    const c=addNode(v.x,v.y);
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
+      if(blocked(v.x+d[0]*0.8,v.y+d[1]*0.8))continue;
+      let prev=c;for(let k=1;k<=2;k++){const id=addNode(v.x+d[0]*0.4*k,v.y+d[1]*0.4*k);link(prev,id);prev=id;}
+      ROADS.push({w:0.6,pts:[[v.x,v.y],[v.x+d[0]*0.8,v.y+d[1]*0.8]]});}
+    return c;
+  });
+  const T=n=>{const i=TOWNS.findIndex(t=>t.n===n);if(i<0)throw new Error('paese '+n);return TID[i];};
+  const APID=AIRPORTS.map(ap=>addNode(ap.x,ap.y));
+  const AP=n=>APID[AIRPORTS.findIndex(a=>a.n===n)];
+  function road(seq,w){
+    const pts=seq.map(e=>typeof e==='number'?[NODES[e].x,NODES[e].y,e]:geo(e[0],e[1]).concat([-1]));
+    let prev=pts[0][2]>=0?pts[0][2]:addNode(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.round(L/0.8));
+      for(let k=1;k<=n;k++){
+        const id=k===n?(b[2]>=0?b[2]:addNode(b[0],b[1])):addNode(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n);
+        link(prev,id);prev=id;
+      }
+    }
+    ROADS.push({w:w||1,pts:pts});
+  }
+  const node=(lat,lon)=>addNode(...geo(lat,lon));
+  const JC=node(46.345,13.135);    // Carnia, sotto la confluenza Fella-Tagliamento
+  const JP=node(45.78,12.84);      // svincolo A4/A28 presso Portogruaro
+  // Carnia e Canal del Ferro
+  road([CN('Udine',46.10,13.24),T('Tricesimo'),T('Artegna'),T('Gemona del Friuli'),T('Venzone'),JC,T('Moggio Udinese'),T('Chiusaforte'),T('Pontebba'),T('Tarvisio')],1.6);
+  road([JC,T('Amaro'),T('Tolmezzo'),T('Villa Santina'),T('Ampezzo'),T('Forni di Sopra')],1.3);
+  road([T('Villa Santina'),[46.47,12.86],T('Forni Avoltri'),T('Sappada')],1);
+  road([T('Tolmezzo'),T('Arta Terme'),T('Paluzza')],1);
+  // collina
+  road([T('Gemona del Friuli'),T('Osoppo'),T('Buja'),T('Artegna')],1);
+  road([T('Tarcento'),T('Artegna')],1);
+  road([T('Tarcento'),T('Tricesimo')],1);
+  road([T('Osoppo'),[46.22,13.04],T('San Daniele')],1);
+  road([T('San Daniele'),T('Fagagna'),CN('Udine',46.07,13.19)],1.1);
+  // pedemontana pordenonese
+  road([T('San Daniele'),[46.13,12.95],T('Spilimbergo'),T('Maniago'),T('Aviano'),CN('Pordenone',45.985,12.655)],1.1);
+  // Pontebbana in pianura e A28
+  road([CN('Udine',46.05,13.20),T('Codroipo'),[45.95,12.84],CN('Pordenone',45.958,12.69)],1.3);
+  road([CN('Pordenone',45.955,12.632),T('Sacile'),[45.96,12.20]],1.2);
+  road([JP,[45.88,12.75],CN('Pordenone',45.937,12.672)],1.3);
+  road([CN('Pordenone',45.94,12.665),T('San Vito al T.'),T('Latisana')],1);
+  // A4 e bassa
+  road([[45.80,12.20],JP,T('Latisana'),[45.84,13.15],T('Palmanova')],1.6);
+  road([T('Latisana'),T('Lignano')],1);
+  road([CN('Udine',46.04,13.25),T('Palmanova'),T('Cervignano'),T('Aquileia'),T('Grado')],1.3);
+  road([T('Palmanova'),[45.865,13.43],T('Gradisca')],1.4);
+  road([T('Cervignano'),[45.80,13.43],AP('Trieste Airport'),T('Monfalcone'),[45.79,13.63],T('Opicina'),CN('Trieste',45.668,13.79)],1.6);
+  road([T('Gradisca'),[45.85,13.48],T('Monfalcone')],1);
+  road([AP('Udine Campoformido'),CN('Udine',46.05,13.20)],0.9);
+  road([AP('Aeroporto Gorizia'),CN('Gorizia',45.925,13.615)],0.9);
+  // Collio e Isontino
+  road([CN('Udine',46.08,13.27),T('Cividale')],1.1);
+  road([CN('Udine',46.045,13.265),T('Manzano'),T('Cormons'),CN('Gorizia',45.945,13.612)],1.1);
+  road([T('Cividale'),T('Manzano')],1);
+  road([T('Gradisca'),T('Cormons')],1);
+  road([T('Gradisca'),CN('Gorizia',45.93,13.612)],1);
+
+  // percorsi minimi tra tutte le coppie di nodi (Dijkstra da ogni nodo)
+  const NN=NODES.length,RD=new Float32Array(NN*NN),RNX=new Int16Array(NN*NN);
+  (function(){
+    const dist=new Float64Array(NN),par=new Int32Array(NN),heap=[];
+    const push=(d,v)=>{heap.push([d,v]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;const t=heap[p];heap[p]=heap[i];heap[i]=t;i=p;}};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;const t=heap[m];heap[m]=heap[i];heap[i]=t;i=m;}}return top;};
+    for(let v=0;v<NN;v++){
+      dist.fill(Infinity);par.fill(-1);dist[v]=0;par[v]=v;heap.length=0;push(0,v);
+      while(heap.length){const [d,u]=pop();if(d>dist[u])continue;
+        for(const [w,c] of ADJ[u]){const nd=d+c;if(nd<dist[w]){dist[w]=nd;par[w]=u;push(nd,w);}}}
+      for(let u=0;u<NN;u++){RD[u*NN+v]=dist[u];RNX[u*NN+v]=par[u];}
+    }
+  })();
+  // aggancio dei luoghi al nodo stradale più vicino (entro 1.6 km)
+  const SNAP=1.6,BK=2,BW=Math.ceil(WORLD/BK),BUCK=[];
+  for(let k=0;k<BW*BW;k++)BUCK.push([]);
+  NODES.forEach((nd,k)=>{if(nd.pl&&nd.x>=0&&nd.y>=0&&nd.x<WORLD&&nd.y<WORLD)BUCK[Math.floor(nd.y/BK)*BW+Math.floor(nd.x/BK)].push(k);});
+  function place(x,y){
+    if(x<0||x>WORLD||y<0||y>WORLD)return -1;
+    const bx=Math.floor(x/BK),by=Math.floor(y/BK);let best=-1,bd=SNAP*SNAP;
+    for(let j=by-1;j<=by+1;j++)for(let i=bx-1;i<=bx+1;i++){if(i<0||j<0||i>=BW||j>=BW)continue;
+      for(const k of BUCK[j*BW+i]){const dx=NODES[k].x-x,dy=NODES[k].y-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}}
+    return best;
+  }
+  function pathNodes(u,v){const out=[u];let k=u,g=0;while(k!==v&&g++<NN){k=RNX[k*NN+v];if(k<0)break;out.push(k);}return out;}
+  const P2=k=>[NODES[k].x,NODES[k].y];
+  function fullRoute(u,v){
+    const A=NODES[u],B=NODES[v],ground=RD[u*NN+v];
+    if(APID.length>1&&Math.hypot(B.x-A.x,B.y-A.y)>FLY_MIN){
+      let best=null,bc=ground;
+      for(const pa of APID)for(const pb of APID){if(pa===pb)continue;
+        const L=Math.hypot(NODES[pb].x-NODES[pa].x,NODES[pb].y-NODES[pa].y);if(L<AIR_MIN)continue;
+        const c=RD[u*NN+pa]+RD[pb*NN+v]+L*AIR_K+AIR_WAIT;
+        if(c<bc){bc=c;best=[pa,pb];}}
+      if(best){
+        const pa=NODES[best[0]],pb=NODES[best[1]];
+        const g1=pathNodes(u,best[0]).map(P2),g2p=pathNodes(best[1],v).map(P2);
+        const dx=pb.x-pa.x,dy=pb.y-pa.y,cx=(pa.x+pb.x)/2-dy*0.18,cy=(pa.y+pb.y)/2+dx*0.18;
+        const arc=[];for(let k=1;k<=16;k++){const q=k/16;arc.push([(1-q)*(1-q)*pa.x+2*(1-q)*q*cx+q*q*pb.x,(1-q)*(1-q)*pa.y+2*(1-q)*q*cy+q*q*pb.y]);}
+        const pts=g1.concat(arc,g2p.slice(1));
+        const kinds=pts.map((_,i)=>i>=g1.length&&i<g1.length+arc.length?'a':'g');
+        return makeRoute(pts,kinds);
+      }
+    }
+    return makeRoute(pathNodes(u,v).map(P2));
+  }
+  function makeRoute(pts,kinds){
+    kinds=kinds||pts.map(()=>'g');
+    const cum=[0];
+    for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])*(kinds[i]==='a'?AIR_K:1));
+    let af=-1,at2=-1;
+    for(let i=1;i<pts.length;i++)if(kinds[i]==='a'){if(af<0)af=cum[i-1];at2=cum[i];}
+    return {pts:pts,kinds:kinds,cum:cum,len:cum[cum.length-1],fly:af>=0,airFrom:af,airTo:at2};
+  }
+  function townOf(x,y){const c=cityAt(x,y);if(c)return c.name;let b='',bd=2;for(const t of TOWNS){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t.n;}}return b;}
+
+  const CANFLY=APID.length>1;
+  function homePos(i,N){
+    // quote di residenti per città, il resto nei paesi
+    let k=i,cx,cy,R,m,cnt=1,found=false;
+    for(const c of CITIES){const n=Math.round(N*c.share);if(k<n){cx=c.x;cy=c.y;R=c.r*0.85;m=k;cnt=n;found=true;break;}k-=n;}
+    if(!found){const nc=CITIES.reduce((s,c)=>s+Math.round(N*c.share),0),V=TOWNS.length;const v=TOWNS[k%V];cx=v.x;cy=v.y;R=0.6;m=Math.floor(k/V);cnt=Math.max(1,Math.ceil((N-nc)/V));}
+    for(let tr=0;tr<40;tr++){
+      const r=R*Math.sqrt((m+0.5)/cnt)+tr*0.25,th=m*GA+tr*0.7;
+      const p=place(cx+r*Math.cos(th),cy+r*Math.sin(th));
+      if(p>=0)return p;
+    }
+    return TID[0];
+  }
+
+
+  function renderTerrain(){
+    const g=tc,S=W2P;
+    g.fillStyle=C.panel;g.fillRect(0,0,MW,MH);
+    // mare
+    g.fillStyle=C.water;g.beginPath();SEA.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.closePath();g.fill();
+    // rilievi: curve di livello
+    for(const c of CIRCLES){
+      if(c.t!=='monti')continue;
+      g.fillStyle=rgba(C.dim,0.08);g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();
+      g.strokeStyle=rgba(C.dim,0.32);g.lineWidth=1*DPR;
+      for(let k=1;k<=4;k++){g.beginPath();
+        for(let a=0;a<=64;a++){const th=a/64*2*Math.PI;const rr=c.r*k/4*(1+0.08*Math.sin(3*th+k));const x=S(c.x+rr*Math.cos(th)),y=S(c.y+rr*Math.sin(th));a?g.lineTo(x,y):g.moveTo(x,y);}
+        g.stroke();}
+    }
+    // città e isolati
+    for(const c of CITIES){
+      g.fillStyle=rgba(C.dim,0.07);g.beginPath();g.arc(S(c.x),S(c.y),S(c.r+0.4),0,7);g.fill();
+      g.fillStyle=rgba(C.dim,0.26);const hw=c.street/2;
+      for(let i=0;i<c.GN-1;i++)for(let j=0;j<c.GN-1;j++){
+        if(c.ids[i*c.GN+j]<0||c.ids[(i+1)*c.GN+j]<0||c.ids[i*c.GN+j+1]<0||c.ids[(i+1)*c.GN+j+1]<0)continue;
+        const x0=c.nX(i)+hw,y0=c.nY(j)+hw,w=c.step-c.street;
+        if(inRiver(x0+w/2,y0+w/2,0.1))continue;
+        g.fillRect(S(x0),S(y0),S(w),S(w));
+      }
+    }
+    // laghi
+    for(const c of CIRCLES){if(c.t!=='lago')continue;g.fillStyle=C.water;g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();}
+    // fiumi
+    g.strokeStyle=C.water;g.lineWidth=Math.max(2,S(2*RIVER_W));g.lineCap='round';g.lineJoin='round';
+    for(const r of RIVERS){g.beginPath();r.pts.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.stroke();}
+    // strade
+    for(const rd of ROADS){g.strokeStyle=rgba(C.ink,0.3);g.lineWidth=Math.max(1,S(0.2*rd.w));g.beginPath();rd.pts.forEach((q,i)=>{if(i)g.lineTo(S(q[0]),S(q[1]));else g.moveTo(S(q[0]),S(q[1]));});g.stroke();}
+    // ponti
+    g.strokeStyle=rgba(C.ink,0.75);g.lineWidth=Math.max(2,S(0.3));g.lineCap='butt';
+    for(let u=0;u<NN;u++)for(const [v] of ADJ[u]){if(v<u)continue;const a=NODES[u],b=NODES[v];
+      if(wet(a.x,a.y,b.x,b.y)){g.beginPath();g.moveTo(S(a.x),S(a.y));g.lineTo(S(b.x),S(b.y));g.stroke();}}
+    // case dei paesi
+    TOWNS.forEach((v,vi)=>{
+      const r=rng(7+vi*31);g.fillStyle=rgba(C.dim,0.5);
+      for(let k=0;k<10;k++){const rr=0.9*Math.sqrt(r()),th=r()*2*Math.PI;const x=v.x+rr*Math.cos(th),y=v.y+rr*Math.sin(th);
+        if(blocked(x,y)||Math.abs(x-v.x)<0.2||Math.abs(y-v.y)<0.2)continue;const sz=0.2+r()*0.12;g.fillRect(S(x-sz/2),S(y-sz/2),S(sz),S(sz));}
+    });
+    // aeroporti
+    for(const ap of AIRPORTS){g.save();g.translate(S(ap.x),S(ap.y));g.fillStyle=rgba(C.ink,0.55);g.rotate(-0.3);g.fillRect(-S(1.5),-S(0.2),S(3.0),S(0.4));g.restore();}
+    // nomi
+    g.textAlign='center';
+    g.fillStyle=rgba(C.ink,0.85);g.font='600 '+(12*DPR)+'px Space Grotesk, sans-serif';
+    for(const c of CITIES)g.fillText(c.name,S(c.x),S(c.y-c.r)-6*DPR);
+    g.font=(9*DPR)+'px Space Grotesk, sans-serif';g.fillStyle=rgba(C.ink,0.68);
+    for(const t of TOWNS)g.fillText(t.n,S(t.x),S(t.y)+S(0.8)+9*DPR);
+    g.fillStyle=C.air;g.font='600 '+(9*DPR)+'px Space Grotesk, sans-serif';
+    for(const ap of AIRPORTS)g.fillText(ap.n,S(ap.x)+30*DPR,S(ap.y)+4*DPR);
+    g.fillStyle=rgba(C.dim,0.95);g.font='italic '+(9*DPR)+'px Space Grotesk, sans-serif';
+    for(const c of CIRCLES)if(c.n)g.fillText(c.n,S(c.x),S(c.y)+(c.t==='lago'?S(c.r)+10*DPR:4*DPR));
+    g.fillStyle=C.ret;
+    {const p=geo(46.03,12.92);g.fillText('Tagliamento',S(p[0])-26*DPR,S(p[1]));}
+    {const p=geo(46.47,13.29);g.fillText('Fella',S(p[0])-16*DPR,S(p[1]));}
+    {const p=geo(45.80,13.50);g.fillText('Isonzo',S(p[0])-18*DPR,S(p[1]));}
+    g.font='italic '+(12*DPR)+'px Space Grotesk, sans-serif';
+    {const p=geo(45.585,13.30);g.fillText('Mare Adriatico',S(p[0]),S(p[1]));}
+    // scala
+    g.textAlign='left';g.strokeStyle=rgba(C.ink,0.6);g.lineWidth=1.5*DPR;g.fillStyle=rgba(C.ink,0.65);g.font=(10*DPR)+'px Space Grotesk, sans-serif';
+    const sx=S(2),sy=S(4);g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+S(10),sy);g.moveTo(sx,sy-4*DPR);g.lineTo(sx,sy);g.moveTo(sx+S(10),sy-4*DPR);g.lineTo(sx+S(10),sy);g.stroke();
+    g.fillText('10 km',sx,sy+12*DPR);
+  }
+
+
+  // quote reali dei centri abitati e di alcuni punti di fondovalle e di pianura (m s.l.m.)
+  const ELEV_PTS=[[46.4083,13.2006,341],[46.2756,13.1389,272],[46.3986,13.0157,323],[46.3317,13.1386,230],[46.4069,13.3125,392],[46.5058,13.3058,568],[46.505,13.5786,754],[46.381,13.093,286],
+    [46.4136,12.9228,363],[46.4808,13.0158,442],[46.532,13.015,600],[46.415,12.797,560],[46.423,12.583,907],[46.585,12.776,888],[46.567,12.685,1217],
+    [46.2556,13.0806,185],[46.2417,13.1531,210],[46.212,13.117,228],[46.2128,13.2153,230],[46.1594,13.2128,199],[46.1592,13.0115,252],[46.1131,13.0844,177],[46.111,12.90,132],[46.169,12.707,283],[46.07,12.59,159],
+    [45.954,12.502,25],[45.915,12.857,31],[45.9614,12.9772,43],[45.78,13.02,9],[45.685,13.125,2],[46.0939,13.4322,135],[45.99,13.38,72],[45.957,13.47,56],[45.895,13.49,32],[45.9056,13.31,27],
+    [45.823,13.336,2],[45.769,13.37,5],[45.692,13.39,2],[45.81,13.533,7],[45.687,13.787,320],
+    [45.655,13.785,20],[45.64,13.80,120],[46.0637,13.2353,113],[45.9564,12.6605,24],[45.94,13.63,86],
+    [46.345,13.135,260],[46.47,12.86,525],[46.39,13.22,316],[46.51,13.48,775],[46.0322,13.1868,94],[45.8275,13.4722,12],[45.9066,13.5993,63],
+    [45.85,12.80,15],[45.75,13.20,3],[46.0,13.0,60],[45.90,13.10,30],[46.05,12.75,90]];
+  // quota sul livello del mare: interpolazione tra punti di quota reale (m s.l.m.), media pesata 1/d² sui 4 più vicini
+  const ELEV=ELEV_PTS.map(p=>{const q=geo(p[0],p[1]);return [q[0],q[1],p[2]];}),ECACHE=new Map();
+  function elevAt(x,y){
+    const key=Math.round(x*20)*100000+Math.round(y*20);let z=ECACHE.get(key);if(z!==undefined)return z;
+    const near=ELEV.map(e=>[(e[0]-x)*(e[0]-x)+(e[1]-y)*(e[1]-y),e[2]]).sort((a,b)=>a[0]-b[0]).slice(0,4);
+    if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
+    ECACHE.set(key,z);return z;
+  }
+  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+}
+
+const MAPDEFS={
+  ny:{tripRef:10.9,pop:12.0e6,popParts:[['Manhattan',1.69e6],['Brooklyn e Queens (con Nassau ovest)',5.75e6],['Bronx e Yonkers',1.68e6],['New Jersey (Newark, Jersey City, Hoboken, Elizabeth)',2.4e6],['Staten Island',0.5e6]],world:55,car:22,l100:10,airL:0.16,airName:'elicottero',airKmh:180,build:buildNewYork,title:"Mobilit\u00e0 umana a New York: esplorazione e ritorno",desc:"New York con distanze reali: Manhattan con la griglia inclinata delle sue avenue e Central Park, Brooklyn e il Queens, il Bronx, Staten Island e il New Jersey da Newark a Hoboken. L'acqua divide tutto: l'Hudson, l'East River, la baia e l'oceano si attraversano solo su ponti e tunnel, o con il traghetto di Staten Island. Dagli eliporti di Manhattan partono le navette in elicottero verso JFK, LaGuardia e Newark: chi vola diventa un aereo viola sulla rotta tratteggiata. Ogni persona vive in uno dei cinque territori, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato."},
+  london:{tripRef:13.3,pop:11.3e6,popParts:[['Greater London',8.8e6],['Cittadine attorno (Watford, Slough, Guildford…)',2.5e6]],world:100,car:27,l100:8,airL:0.04,airName:'aereo',airKmh:500,build:buildLondra,title:"Mobilit\u00e0 umana a Londra: esplorazione e ritorno",desc:"Londra e dintorni, con distanze reali: la citt\u00e0 con il Tamigi e i suoi ponti, l'anello della M25, le autostrade radiali, diciotto cittadine attorno e cinque aeroporti. Ogni persona vive a Londra o in una delle cittadine, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade, e per i viaggi lunghi si pu\u00f2 prendere l'aereo: chi vola diventa un aereo viola che segue la rotta tratteggiata fino all'aeroporto di arrivo."},
+  fvg:{tripRef:12.7,pop:1.19e6,popParts:[['Trieste',199e3],['Udine',97e3],['Pordenone',51e3],['Gorizia',33e3],['Resto della regione',810e3]],world:125,car:45,l100:6.5,airL:0.06,airName:'aereo leggero',airKmh:200,build:buildFriuli,title:"Mobilit\u00e0 umana in Friuli Venezia Giulia: esplorazione e ritorno",desc:"Tutto il Friuli Venezia Giulia con distanze reali: Trieste, Udine, Pordenone e Gorizia con le loro reti di strade, quaranta paesi dalla Carnia alla costa, autostrade e statali principali, il Tagliamento, il Fella e l'Isonzo con i loro ponti, il mare Adriatico, i monti e i laghi. Ogni persona vive in una citt\u00e0 o in un paese, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade."}
+};
+let MAP=null,NODES=[],CANFLY=false;const MAPS={};
+const elevAt=(x,y)=>MAP.elevAt(x,y),place=(x,y)=>MAP.place(x,y),fullRoute=(u,v)=>MAP.fullRoute(u,v),makeRoute=(p,k)=>MAP.makeRoute(p,k);
+const townOf=(x,y)=>MAP.townOf(x,y),homePos=(i,N)=>MAP.homePos(i,N),P2=k=>[NODES[k].x,NODES[k].y];
+
+function at(r,s){
+  if(r.len<=0)return r.pts[r.pts.length-1];
+  const d=s*r.len;let i=1;
+  while(i<r.pts.length-1&&r.cum[i]<d)i++;
+  const a=r.pts[i-1],b=r.pts[i],seg=r.cum[i]-r.cum[i-1],u=seg>0?(d-r.cum[i-1])/seg:1;
+  return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];
+}
+function sub(r,s0,s1){
+  const out=[at(r,s0)],d0=s0*r.len,d1=s1*r.len;
+  for(let i=1;i<r.pts.length-1;i++)if(r.cum[i]>d0&&r.cum[i]<d1)out.push(r.pts[i]);
+  out.push(at(r,s1));return out;
+}
+
+/* ---------- stato ---------- */
+let agents=[],t=0,running=true,sel=0,frameN=0,cycle=1,flights=0;
+let contacts=0,sparks=[],touching=new Set();
+/* ---------- tempo: ogni passo è uno spostamento in auto ----------
+   minuti per passo = km medi del percorso / velocità media in auto
+   passi al giorno  = minuti di guida al giorno / minuti per passo */
+const DRIVE_MIN=65;   // tempo medio passato in auto ogni giorno (circa un'ora: costante di Marchetti)
+let kmSum=0,kmN=0,days=0,curMap='ny';
+/* ---------- carburante ----------
+   auto: km di strada × consumo (l/100 km), più alto dove il traffico è lento
+   volo: km in aria × litri per passeggero al km (elicottero a New York, aereo altrove) */
+let fuel=0,fuelAir=0,fuelFrame=0,fuelRate=0,airH=0,fuelElev=0,climbM=0;
+/* dislivello: per salire di h metri un'auto di massa m deve guadagnare l'energia potenziale m·g·h;
+   il motore la ottiene bruciando carburante con rendimento η, e un litro contiene l'energia E.
+   litri per metro di salita: K_UP = m·g / (η·E) = 1400 kg · 9,81 m/s² / (0,25 · 32 MJ/l) ≈ 0,0017 l/m.
+   in discesa si recupera metà di quell'energia (il motore lavora meno), ma al massimo l'80% del consumo del tratto. */
+const CAR_KG=1400,G=9.81,ETA=0.25,E_L=32e6,K_UP=CAR_KG*G/(ETA*E_L),DOWN_REC=0.5,DOWN_MAX=0.8;   // airH: ore di volo delle persone simulate
+function tripKm(){return kmN?kmSum/kmN:8;}
+// la scala del tempo usa un viaggio medio di riferimento fisso per ogni mappa (media misurata su un ciclo
+// completo di 4000 passi dopo il riscaldamento), così i passi al giorno restano costanti; il viaggio medio misurato serve solo come confronto
+function tripMin(){const d=MAPDEFS[curMap];return d.tripRef/d.car*60;}
+function stepsPerDay(){return Math.max(0.5,Math.min(12,DRIVE_MIN/tripMin()));}
+let histE,histA,Sser;
+let acc=0,lastTs=0,tau=0,pend=0;   // tau: tempo continuo misurato in passi
+const C={};
+function readColors(){
+  const cs=getComputedStyle(document.documentElement);
+  ['bg','panel','ink','dim','line','amber','gold','hot','ret','grid','water','air'].forEach(k=>C[k]=cs.getPropertyValue('--'+k).trim());
+}
+function rgba(hex,a){
+  const h=hex.replace('#','');
+  return 'rgba('+parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16)+','+a+')';
+}
+
+function sampleJump(){
+  const b=P.beta,x0=P.dr0,xm=RMAX;let x=x0;
+  for(let k=0;k<2000;k++){
+    const u=Math.random();
+    if(Math.abs(b-1)<1e-6){x=x0*Math.pow((xm+x0)/x0,u)-x0;}
+    else{const a0=Math.pow(x0,1-b),a1=Math.pow(xm+x0,1-b);x=Math.pow(a0-u*(a0-a1),1/(1-b))-x0;}
+    if(Math.random()<Math.exp(-x/P.kappa))return x;
+  }
+  return x;
+}
+function binOf(d){
+  if(d<RMIN||d>=RMAX)return -1;
+  return Math.min(NB-1,Math.floor(Math.log(d/RMIN)/Math.log(RMAX/RMIN)*NB));
+}
+
+// case: 60% in città, il resto nei villaggi, ognuno con la sua spirale aurea
+function reset(keep){
+  if(!keep)cycle=1;
+  agents=[];t=0;acc=0;tau=0;densReset();flights=0;topZone=null;topPP=null;contacts=0;sparks=[];touching=new Set();kmSum=0;kmN=0;days=0;fuel=0;fuelAir=0;fuelFrame=0;airH=0;fuelRate=0;fuelElev=0;climbM=0;
+  histE=new Float64Array(NB);histA=new Float64Array(NB);Sser=[];
+  for(let i=0;i<P.N;i++){
+    const h=homePos(i,P.N);
+    const r=makeRoute([P2(h)]);
+    agents.push({locs:[{x:NODES[h].x,y:NODES[h].y,node:h,n:1}],known:new Set([h]),zone:townOf(NODES[h].x,NODES[h].y)||'altrove',fuel:0,cur:0,total:1,moves:0,expl:0,route:r,hist:[r],last:'r',flash:0,flights:0,next:Math.random(),t0:-1});   // ognuno parte con un ritardo diverso
+  }
+  sel=Math.min(sel,P.N-1);
+  warmup();
+  running=true;$('play').textContent='Pausa';
+}
+
+/* ---------- ritmo giornaliero ----------
+   ogni giornata ha K spostamenti (K = passi al giorno); l'ultimo riporta a casa per la notte.
+   le 14 ore di giorno si dividono tra le K soste; la sosta serale a casa aggiunge le 10 ore di notte. */
+const NIGHT_H=10;
+function stepAgent(a){
+  const S=a.locs.length;
+  const pNew=Math.min(1,P.rho*Math.pow(S,-P.gamma));
+  const from=a.locs[a.cur];
+  const K=Math.max(2,Math.round(stepsPerDay()));
+  a.k=(a.k||0)+1;
+  const night=a.k%K===0;
+  let idx=a.cur,explored=false;
+  if(night){idx=0;explored=true;a.last='r';}   // rientro serale
+  else if(Math.random()<pNew){
+    let p=-1,dr=0;
+    for(let tr=0;tr<40&&p<0;tr++){dr=sampleJump();const ang=Math.random()*2*Math.PI;p=place(from.x+dr*Math.cos(ang),from.y+dr*Math.sin(ang));if(a.known.has(p))p=-1;}
+    if(p>=0){
+      const b=binOf(dr);if(b>=0)histE[b]++;
+      a.known.add(p);
+      a.locs.push({x:NODES[p].x,y:NODES[p].y,node:p,n:0});idx=a.locs.length-1;a.expl++;
+      a.last='e';a.flash=1;explored=true;
+    }
+  }
+  if(!explored){
+    const tot=a.total-from.n;
+    if(tot>0){
+      let r=Math.random()*tot;
+      for(let i=0;i<a.locs.length;i++){
+        if(i===a.cur)continue;
+        r-=a.locs[i].n;
+        if(r<=0){idx=i;break;}
+      }
+    }
+    a.last='r';
+  }
+  const to=a.locs[idx];
+  const d=Math.hypot(to.x-from.x,to.y-from.y);
+  if(d>0){const b=binOf(d);if(b>=0)histA[b]++;}
+  to.n++;a.total++;a.cur=idx;a.moves++;
+  const dur=(24-NIGHT_H)/K+(night?NIGHT_H:0);
+  a.hAll=(a.hAll||0)+dur;if(idx===0)a.hHome=(a.hHome||0)+dur;
+  a.route=to.node!==from.node?fullRoute(from.node,to.node):makeRoute([[to.x,to.y]]);
+  if(a.route.len>0){
+    const md=MAPDEFS[curMap];
+    let g=0,air=0,adj=0,up=0;const r=a.route;
+    for(let i=1;i<r.pts.length;i++){
+      const p0=r.pts[i-1],p1=r.pts[i],d=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]);
+      if(r.kinds[i]==='a'){air+=d;continue;}
+      g+=d;
+      // dislivello del tratto: in salita si paga l'energia potenziale, in discesa se ne recupera una parte
+      const dh=elevAt(p1[0],p1[1])-elevAt(p0[0],p0[1]);
+      if(dh>0){adj+=dh*K_UP;up+=dh;}else if(dh<0)adj-=Math.min(d*md.l100/100*DOWN_MAX,-dh*K_UP*DOWN_REC);
+    }
+    kmSum+=g;kmN++;
+    const lc=g*md.l100/100+adj,la=air*md.airL;
+    fuelElev+=adj;climbM+=up;a.climb=(a.climb||0)+up;
+    fuel+=lc+la;fuelAir+=la;fuelFrame+=lc+la;a.fuel+=lc+la;a.fuelAir=(a.fuelAir||0)+la;
+    if(air>0){const h=air/md.airKmh;airH+=h;a.airH=(a.airH||0)+h;}
+  }
+  if(a.route.fly){a.flights++;flights++;}
+  a.hist.push(a.route);if(a.hist.length>12)a.hist.shift();
+}
+
+// il tempo scorre in modo continuo: ogni persona fa il suo passo quando arriva il suo turno,
+// sfasata rispetto alle altre, così non partono e non si fermano tutte insieme
+function advance(ds){
+  const target=tau+ds;
+  for(const a of agents){let g=0;while(a.next<=target&&g++<80){stepAgent(a);a.t0=a.next;a.next+=1;}}
+  tau=target;
+  while(t+1<=tau){
+    t++;days+=1/stepsPerDay();
+    if(t%5===0||t<20){let s=0;for(const a of agents)s+=a.locs.length;Sser.push([t,s/agents.length]);}
+  }
+  if(t>=WARMUP+T_MAX){cycle++;reset(true);}
+}
+// riscaldamento: la simulazione gira di nascosto, così le persone partono con una rete di luoghi già consolidata;
+// poi si azzerano tempo, carburante, CO₂, voli, contatti e densità, e si comincia a contare
+function warmup(){
+  for(let s=0;s<WARMUP;s++)advance(1);
+  days=0;kmSum=0;kmN=0;fuel=0;fuelAir=0;fuelFrame=0;fuelRate=0;airH=0;fuelElev=0;climbM=0;flights=0;contacts=0;sparks=[];touching=new Set();densReset();topZone=null;topPP=null;
+  for(const a of agents){a.fuel=0;a.fuelAir=0;a.airH=0;a.climb=0;a.flights=0;a.hHome=0;a.hAll=0;a.t0=tau-1;a.flash=0;}
+}
+const progress=b=>REDUCED?1:Math.max(0,Math.min(1,tau-b.t0));
+
+/* ---------- disegno ---------- */
+const map=$('map'),mctx=map.getContext('2d');
+const terr=document.createElement('canvas'),tc=terr.getContext('2d');
+let MW=0,MH=0,DPR=1;
+const W2P=v=>v/WORLD*MW;
+function sizeMap(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  MW=Math.round(map.clientWidth*DPR);MH=MW;
+  map.width=MW;map.height=MH;terr.width=MW;terr.height=MH;
+  renderTerrain();
+}
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let x=Math.imul(seed^seed>>>15,1|seed);x=x+Math.imul(x^x>>>7,61|x)^x;return((x^x>>>14)>>>0)/4294967296;};}
+
+function renderTerrain(){if(MAP)MAP.renderTerrain();}
+
+function dot(x,y,r){mctx.beginPath();mctx.arc(x,y,r,0,7);mctx.fill();}
+function drawRoute(r,sv){
+  if(r.len<=0)return;const D=sv*r.len;
+  for(let i=1;i<r.pts.length;i++){
+    if(r.cum[i-1]>=D)break;
+    const a=r.pts[i-1];let b=r.pts[i];
+    if(r.cum[i]>D){const u=(D-r.cum[i-1])/(r.cum[i]-r.cum[i-1]);b=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];}
+    const air=r.kinds[i]==='a',prev=mctx.strokeStyle;
+    if(air){mctx.setLineDash([5*DPR,4*DPR]);mctx.strokeStyle=rgba(C.air,0.85);}
+    mctx.beginPath();mctx.moveTo(W2P(a[0]),W2P(a[1]));mctx.lineTo(W2P(b[0]),W2P(b[1]));mctx.stroke();
+    if(air){mctx.setLineDash([]);mctx.strokeStyle=prev;}
+  }
+  mctx.setLineDash([]);
+}
+// rotta di volo intera, tratteggiata, visibile per tutta la durata del viaggio
+function flightPath(r,alpha){
+  mctx.strokeStyle=rgba(C.air,alpha);mctx.lineWidth=1.4*DPR;mctx.setLineDash([5*DPR,4*DPR]);mctx.beginPath();
+  for(let i=1;i<r.pts.length;i++)if(r.kinds[i]==='a'){const a=r.pts[i-1],b=r.pts[i];mctx.moveTo(W2P(a[0]),W2P(a[1]));mctx.lineTo(W2P(b[0]),W2P(b[1]));}
+  mctx.stroke();mctx.setLineDash([]);
+  const s0=r.pts.find((_,i)=>r.kinds[i+1]==='a'),s1=r.pts[r.kinds.lastIndexOf('a')];
+  mctx.fillStyle=rgba(C.air,alpha);
+  if(s0){mctx.beginPath();mctx.arc(W2P(s0[0]),W2P(s0[1]),4*DPR,0,7);mctx.fill();}
+  if(s1){mctx.beginPath();mctx.arc(W2P(s1[0]),W2P(s1[1]),4*DPR,0,7);mctx.fill();}
+}
+const isFlying=(r,e)=>r.fly&&e*r.len>r.airFrom&&e*r.len<r.airTo;
+function plane(r,e,x,y,size){
+  const q=at(r,Math.max(0,e-0.01)),ang=Math.atan2(y-W2P(q[1]),x-W2P(q[0]));
+  mctx.save();mctx.translate(x,y);mctx.rotate(ang);mctx.fillStyle=C.air;
+  mctx.beginPath();mctx.moveTo(size*DPR,0);mctx.lineTo(-size*0.7*DPR,size*0.6*DPR);mctx.lineTo(-size*0.35*DPR,0);mctx.lineTo(-size*0.7*DPR,-size*0.6*DPR);mctx.closePath();mctx.fill();
+  mctx.restore();
+}
+function poly(pts){mctx.beginPath();pts.forEach((p,i)=>{const x=W2P(p[0]),y=W2P(p[1]);if(i)mctx.lineTo(x,y);else mctx.moveTo(x,y);});}
+const ease=p=>0.5-0.5*Math.cos(Math.PI*p);
+// scia con inerzia: la coda parte in ritardo e raggiunge la testa all'arrivo
+function streak(r,p0,col,w){
+  if(p0>=1||r.len<=0)return;
+  const h=ease(p0),q=ease(Math.max(0,(p0-0.3)/0.7));if(h-q<1e-4)return;
+  const pts=sub(r,q,h),T=pts[0],H=pts[pts.length-1];
+  if(Math.hypot(W2P(H[0]-T[0]),W2P(H[1]-T[1]))<1)return;
+  const g=mctx.createLinearGradient(W2P(T[0]),W2P(T[1]),W2P(H[0]),W2P(H[1]));
+  g.addColorStop(0,rgba(col,0));g.addColorStop(1,rgba(col,0.9));
+  mctx.strokeStyle=g;mctx.lineWidth=w*DPR;mctx.lineCap='round';mctx.lineJoin='round';
+  poly(pts);mctx.stroke();
+}
+
+// collisioni tra persone: chi si sovrappone viene spinto via, poi una molla lo riporta sulla strada
+function placeAgents(){
+  const sa=agents[sel],n=agents.length;
+  for(const b of agents){
+    b.p0=progress(b);b.e=ease(b.p0);const e=b.e;
+    const p=at(b.route,e);b.tx=W2P(p[0]);b.ty=W2P(p[1]);b.fl=isFlying(b.route,e);b.rad=(b===sa?8:3.2)*DPR;
+    if(b.ox===undefined){b.ox=0;b.oy=0;}
+    b.ox*=0.85;b.oy*=0.85;if(b.fl){b.ox=0;b.oy=0;}
+  }
+  const now=new Set();
+  for(let it=0;it<3;it++)for(let i=0;i<n;i++){
+    const A=agents[i];if(A.fl)continue;
+    for(let j=i+1;j<n;j++){
+      const B=agents[j];if(B.fl)continue;
+      let dx=(B.tx+B.ox)-(A.tx+A.ox),dy=(B.ty+B.oy)-(A.ty+A.oy);const md=A.rad+B.rad+DPR;
+      if(Math.abs(dx)>md||Math.abs(dy)>md)continue;
+      let d=Math.hypot(dx,dy);if(d>=md)continue;
+      if(d<1e-3){const an=((i*7+j*13)%628)/100;dx=Math.cos(an);dy=Math.sin(an);d=1;}
+      const push=(md-d)/2,ux=dx/d,uy=dy/d;
+      A.ox-=ux*push;A.oy-=uy*push;B.ox+=ux*push;B.oy+=uy*push;
+      if(it===0){const k=i*4096+j;now.add(k);
+        if(!touching.has(k)){contacts++;if(!REDUCED&&sparks.length<200)sparks.push({x:(A.tx+B.tx)/2,y:(A.ty+B.ty)/2,l:1});}}
+    }
+  }
+  touching=now;
+  const M=14*DPR;
+  for(const b of agents){const m=Math.hypot(b.ox,b.oy);if(m>M){b.ox*=M/m;b.oy*=M/m;}b.x=b.tx+b.ox;b.y=b.ty+b.oy;}
+}
+
+function drawMap(ts){
+  mctx.drawImage(terr,0,0);
+  placeAgents();
+  // mappa di densità (sotto le persone)
+  if(SHOW.dens&&topDens){
+    const c=cellKm(),w=W2P(c),mx=topDens.v;
+    for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){const v=DENS[j*DG+i];if(v<0.02)continue;
+      mctx.fillStyle=rgba(C.ret,0.32*Math.pow(v/mx,0.6));mctx.fillRect(i*w,j*w,w,w);}
+    const x=topDens.i*w,y=topDens.j*w;
+    mctx.strokeStyle=C.ret;mctx.lineWidth=2*DPR;mctx.setLineDash([5*DPR,3*DPR]);mctx.strokeRect(x,y,w,w);mctx.setLineDash([]);
+    mctx.fillStyle=C.ret;mctx.font='600 '+(11*DPR)+'px Space Grotesk, sans-serif';mctx.textAlign='center';
+    const lab='densità massima: '+topDens.name+', '+Math.round(topDens.d).toLocaleString('it-IT')+' ab./km²',tw=mctx.measureText(lab).width;
+    const lx=Math.min(MW-tw/2-4*DPR,Math.max(tw/2+4*DPR,x+w/2)),ly=y+w+14*DPR>MH-4*DPR?y-6*DPR:y+w+14*DPR;
+    mctx.fillText(lab,lx,ly);
+    mctx.textAlign='left';
+  }
+  const a=agents[sel];
+  if(a){
+    mctx.fillStyle=rgba(C.ink,0.13);
+    for(const l of a.locs)dot(W2P(l.x),W2P(l.y),Math.max(1.5,Math.sqrt(l.n/a.total)*42)*DPR);
+  }
+  for(const b of agents){
+    if(b===a)continue;
+    const P0=b.p0,e=b.e,fl=b.fl;
+    const col=fl?C.air:(b.last==='e'?C.amber:C.ret),x=b.x,y=b.y;
+    if(b.route.fly&&P0<1)flightPath(b.route,0.35);
+    streak(b.route,P0,col,fl?2.2:1.6);
+    if(b.flash>0&&!REDUCED){
+      mctx.strokeStyle=rgba(C.amber,b.flash);mctx.lineWidth=1.5*DPR;
+      mctx.beginPath();mctx.arc(x,y,(3+(1-b.flash)*14)*DPR,0,7);mctx.stroke();
+    }
+    b.flash=Math.max(0,b.flash-0.04);
+    if(fl)plane(b.route,e,x,y,6);else{mctx.fillStyle=col;dot(x,y,2.8*DPR);}
+  }
+  if(a){
+    const P0=a.p0,e=a.e,fl=a.fl;
+    const col=fl?C.air:(a.last==='e'?C.amber:C.ret);
+    if(a.route.fly&&P0<1)flightPath(a.route,0.6);
+    mctx.strokeStyle=rgba(C.gold,0.8);mctx.lineWidth=1.8*DPR;mctx.lineJoin='round';mctx.lineCap='round';
+    for(let i=0;i<a.hist.length-1;i++)drawRoute(a.hist[i],1);
+    drawRoute(a.route,e);
+    streak(a.route,P0,col,3);
+    const h=a.locs[0];mctx.strokeStyle=C.ink;mctx.lineWidth=1.5*DPR;
+    mctx.strokeRect(W2P(h.x)-6*DPR,W2P(h.y)-6*DPR,12*DPR,12*DPR);
+    const ix=a.x,iy=a.y;
+    if(a.flash>0&&!REDUCED){
+      mctx.strokeStyle=rgba(C.amber,a.flash);mctx.lineWidth=2*DPR;
+      mctx.beginPath();mctx.arc(ix,iy,(6+(1-a.flash)*20)*DPR,0,7);mctx.stroke();
+    }
+    a.flash=Math.max(0,a.flash-0.03);
+    if(fl)plane(a.route,e,ix,iy,11);else{mctx.fillStyle=col;dot(ix,iy,6*DPR);}
+    mctx.strokeStyle=C.ink;mctx.lineWidth=1.5*DPR;mctx.beginPath();mctx.arc(ix,iy,8*DPR,0,7);mctx.stroke();
+  }
+  // zona a maggior consumo
+  if(SHOW.pump&&topZone){
+    const zx=W2P(topZone.x),zy=W2P(topZone.y),zr=W2P(topZone.r);
+    mctx.fillStyle=rgba(C.hot,0.07);mctx.beginPath();mctx.arc(zx,zy,zr,0,7);mctx.fill();
+    mctx.strokeStyle=rgba(C.hot,0.85);mctx.lineWidth=2*DPR;mctx.setLineDash([6*DPR,4*DPR]);
+    mctx.beginPath();mctx.arc(zx,zy,zr,0,7);mctx.stroke();mctx.setLineDash([]);
+    mctx.fillStyle=C.hot;for(const h of topZone.homes){mctx.fillRect(W2P(h.x)-3*DPR,W2P(h.y)-3*DPR,6*DPR,6*DPR);}
+    // pompa di benzina nel punto consigliato
+    const px=W2P(topZone.px),py=W2P(topZone.py),u=DPR*1.5;
+    mctx.fillStyle=C.hot;mctx.strokeStyle=C.panel;mctx.lineWidth=1.5*u;
+    mctx.fillRect(px-6*u,py-9*u,10*u,16*u);mctx.strokeRect(px-6*u,py-9*u,10*u,16*u);
+    mctx.fillStyle=C.panel;mctx.fillRect(px-4*u,py-7*u,6*u,4*u);
+    mctx.strokeStyle=C.hot;mctx.lineWidth=1.5*u;mctx.beginPath();mctx.moveTo(px+4*u,py-5*u);mctx.lineTo(px+8*u,py-2*u);mctx.lineTo(px+8*u,py+5*u);mctx.stroke();
+    mctx.fillStyle=C.hot;mctx.font='600 '+(11*DPR)+'px Space Grotesk, sans-serif';mctx.textAlign='center';
+    const k2=popScale(),lab='distributore consigliato: '+topZone.name+', '+fmtL(topZone.fuel/Math.max(days,1e-9)*k2)+' al giorno',tw=mctx.measureText(lab).width;
+    mctx.fillText(lab,Math.min(MW-tw/2-4*DPR,Math.max(tw/2+4*DPR,zx)),Math.max(14*DPR,zy-zr-6*DPR));
+    mctx.textAlign='left';
+  }
+  // consumo massimo a testa: cerchio dorato con le case dei residenti
+  if(SHOW.pp&&topPP){
+    const zx=W2P(topPP.x),zy=W2P(topPP.y),zr=W2P(topPP.r)+(topPP===topZone?6*DPR:0);
+    mctx.fillStyle=rgba(C.gold,0.06);mctx.beginPath();mctx.arc(zx,zy,zr,0,7);mctx.fill();
+    mctx.strokeStyle=rgba(C.gold,0.9);mctx.lineWidth=2*DPR;mctx.setLineDash([2*DPR,4*DPR]);
+    mctx.beginPath();mctx.arc(zx,zy,zr,0,7);mctx.stroke();mctx.setLineDash([]);
+    mctx.fillStyle=C.gold;for(const h of topPP.homes){mctx.beginPath();mctx.arc(W2P(h.x),W2P(h.y),3*DPR,0,7);mctx.fill();}
+    mctx.font='600 '+(11*DPR)+'px Space Grotesk, sans-serif';mctx.textAlign='center';
+    const lab='consumo massimo a testa: '+topPP.name+', '+topPP.pp.toLocaleString('it-IT',{maximumFractionDigits:1})+' L/ab. al giorno',tw=mctx.measureText(lab).width;
+    const ly=zy+zr+16*DPR>MH-4*DPR?zy-zr-22*DPR:zy+zr+16*DPR;
+    mctx.fillText(lab,Math.min(MW-tw/2-4*DPR,Math.max(tw/2+4*DPR,zx)),ly);
+    mctx.textAlign='left';
+  }
+  // scintille dei contatti
+  mctx.lineWidth=1.2*DPR;
+  for(const sp of sparks){mctx.strokeStyle=rgba(C.ink,sp.l*0.8);mctx.beginPath();mctx.arc(sp.x,sp.y,(2+(1-sp.l)*9)*DPR,0,7);mctx.stroke();sp.l-=0.06;}
+  sparks=sparks.filter(sp=>sp.l>0);
+  $('hud').textContent='giorno '+(Math.floor(days)+1)+' (anno '+(Math.floor(days/365)+1)+')   passo '+Math.max(0,t-WARMUP)+' / '+T_MAX+'   ciclo '+cycle+(CANFLY?'   voli '+flights+' ('+fmtH(airH)+' in volo)':'')+'   contatti '+contacts;
+}
+
+map.addEventListener('click',ev=>{
+  const r=map.getBoundingClientRect();
+  const wx=(ev.clientX-r.left)/r.width*WORLD,wy=(ev.clientY-r.top)/r.height*WORLD;
+  let best=0,bd=1e9;
+  agents.forEach((a,i)=>{const l=a.locs[a.cur];const d=(l.x-wx)*(l.x-wx)+(l.y-wy)*(l.y-wy);if(d<bd){bd=d;best=i;}});
+  sel=best;updateWho();
+});
+
+function homeShare(){let h=0,all=0;for(const b of agents){h+=b.hHome||0;all+=b.hAll||0;}return all?h/all*100:100;}
+const fmtH=h=>h<1?Math.round(h*60)+' min':h<100?h.toLocaleString('it-IT',{maximumFractionDigits:1})+' ore':Math.round(h).toLocaleString('it-IT')+' ore';
+function updateWho(){
+  const a=agents[sel];if(!a)return;
+  const S=a.locs.length,pNew=Math.min(1,P.rho*Math.pow(S,-P.gamma));
+  const top=a.locs.map(l=>l.n).sort((x,y)=>y-x);
+  const h=a.locs[0];
+  $('who-title').textContent='Persona #'+(sel+1)+(townOf(h.x,h.y)?', vive a '+townOf(h.x,h.y):'');
+  $('pn-val').textContent=(pNew*100).toFixed(1)+'%';
+  $('pn-bar').style.width=(pNew*100)+'%';
+  $('who').innerHTML=
+    '<span>Luoghi visitati</span><span>'+S+'</span>'+
+    '<span>Esplorazioni</span><span>'+a.expl+' su '+a.moves+' passi</span>'+
+    '<span>Voli presi</span><span>'+a.flights+(a.airH?' · '+fmtH(a.airH)+' in volo':'')+'</span>'+
+    '<span>Carburante al giorno</span><span>'+(days>0.5?(a.fuel/days).toLocaleString('it-IT',{maximumFractionDigits:2})+' L':'–')+'</span>'+
+    '<span>CO₂ al giorno</span><span>'+(days>0.5?(co2Of(a.fuel-(a.fuelAir||0),a.fuelAir||0)/days).toLocaleString('it-IT',{maximumFractionDigits:2})+' kg':'–')+'</span>'+
+    '<span>Casa a</span><span>'+Math.round(elevAt(a.locs[0].x,a.locs[0].y))+' m s.l.m.</span>'+
+    '<span>Salita al giorno</span><span>'+(days>0.5?Math.round((a.climb||0)/days)+' m':'–')+'</span>'+
+    '<span>Tempo a casa</span><span>'+(a.hAll?(a.hHome||0)/a.hAll*100:100).toFixed(1)+'%</span>'+
+    '<span>Media di tutti</span><span>'+homeShare().toFixed(1)+'%</span>'+
+    '<span>Primi 3 luoghi</span><span>'+(top.slice(0,3).reduce((s,v)=>s+v,0)/a.total*100).toFixed(1)+'% delle soste</span>';
+}
+
+/* ---------- grafici log-log ---------- */
+function prepCanvas(cv){
+  const w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==Math.round(w*DPR)||cv.height!==Math.round(h*DPR)){cv.width=Math.round(w*DPR);cv.height=Math.round(h*DPR);}
+  return cv.getContext('2d');
+}
+function fmt(e){return e===0?'1':e===1?'10':e===-1?'0.1':'1e'+e;}
+function loglog(cv,o){
+  const ctx=prepCanvas(cv),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const L=38*DPR,R=8*DPR,T=8*DPR,B=22*DPR;
+  const ys=[];o.series.forEach(s=>s.pts.forEach(p=>{if(p[1]>0)ys.push(p[1]);}));
+  if(!ys.length){ctx.fillStyle=C.dim;ctx.font=(12*DPR)+'px Space Grotesk, sans-serif';ctx.fillText('In attesa di dati…',L,H/2);return;}
+  const ymin=Math.pow(10,Math.floor(Math.log10(Math.min.apply(null,ys))));
+  let ymax=Math.pow(10,Math.ceil(Math.log10(Math.max.apply(null,ys))));
+  if(ymax<=ymin)ymax=ymin*10;
+  const lx0=Math.log10(o.xmin),lx1=Math.log10(o.xmax),ly0=Math.log10(ymin),ly1=Math.log10(ymax);
+  const X=x=>L+(Math.log10(x)-lx0)/(lx1-lx0)*(W-L-R);
+  const Y=y=>T+(1-(Math.log10(y)-ly0)/(ly1-ly0))*(H-T-B);
+  ctx.strokeStyle=C.line;ctx.lineWidth=1;ctx.fillStyle=C.dim;ctx.font=(10*DPR)+'px JetBrains Mono, monospace';
+  for(let e=Math.ceil(lx0);e<=Math.floor(lx1);e++){const x=X(Math.pow(10,e));ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,H-B);ctx.stroke();ctx.fillText(fmt(e),x-6*DPR,H-6*DPR);}
+  const step=Math.max(1,Math.ceil((ly1-ly0)/5));
+  for(let e=Math.ceil(ly0);e<=Math.floor(ly1);e+=step){const y=Y(Math.pow(10,e));ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(W-R,y);ctx.stroke();ctx.fillText(fmt(e),2*DPR,y+3*DPR);}
+  o.series.forEach(s=>{
+    const pts=s.pts.filter(p=>p[1]>=ymin&&p[1]<=ymax&&p[0]>=o.xmin&&p[0]<=o.xmax);
+    if(s.kind==='dots'){ctx.fillStyle=s.color;pts.forEach(p=>{ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),2.6*DPR,0,7);ctx.fill();});}
+    else{ctx.strokeStyle=s.color;ctx.lineWidth=(s.w||1.6)*DPR;ctx.setLineDash(s.dash?[4*DPR,3*DPR]:[]);ctx.beginPath();pts.forEach((p,i)=>{if(i)ctx.lineTo(X(p[0]),Y(p[1]));else ctx.moveTo(X(p[0]),Y(p[1]));});ctx.stroke();ctx.setLineDash([]);}
+  });
+}
+function slope(pts){
+  const n=pts.length;if(n<3)return NaN;
+  let sx=0,sy=0,sxx=0,sxy=0;
+  pts.forEach(p=>{const x=Math.log(p[0]),y=Math.log(p[1]);sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;});
+  return (n*sxy-sx*sy)/(n*sxx-sx*sx);
+}
+function drawCharts(){
+  const toDens=h=>{const tot=h.reduce((s,v)=>s+v,0);const out=[];if(!tot)return out;
+    for(let i=0;i<NB;i++){if(h[i]>0){const w=EDGES[i+1]-EDGES[i];out.push([Math.sqrt(EDGES[i]*EDGES[i+1]),h[i]/tot/w]);}}return out;};
+  const f=x=>Math.pow(x+P.dr0,-P.beta)*Math.exp(-x/P.kappa);
+  const raw=[];let thTot=0;
+  for(let i=0;i<NB;i++){const w=EDGES[i+1]-EDGES[i],m=Math.sqrt(EDGES[i]*EDGES[i+1]);
+    let s=0;for(let j=0;j<8;j++)s+=f(EDGES[i]+w*(j+0.5)/8);s=s/8*w;raw.push([m,s,w]);thTot+=s;}
+  const th=raw.map(r=>[r[0],r[1]/thTot/r[2]]);
+  loglog($('c-jump'),{xmin:RMIN,xmax:RMAX,series:[
+    {pts:toDens(histA),color:C.dim,kind:'line',w:1.2},
+    {pts:th,color:C.hot,kind:'line',dash:true},
+    {pts:toDens(histE),color:C.amber,kind:'dots'}]});
+  const K=30,sum=new Float64Array(K),cnt=new Float64Array(K);
+  agents.forEach(a=>{if(a.locs.length<3)return;const s=a.locs.map(l=>l.n).sort((x,y)=>y-x);
+    for(let k=0;k<Math.min(K,s.length);k++){sum[k]+=s[k]/a.total;cnt[k]++;}});
+  const zp=[];for(let k=0;k<K;k++)if(cnt[k]>=Math.max(1,agents.length*0.3))zp.push([k+1,sum[k]/cnt[k]]);
+  const z=-slope(zp.slice(0,10));
+  $('m-zeta').textContent=isFinite(z)?z.toFixed(2)+' (atteso '+(1+P.gamma).toFixed(2)+')':'–';
+  const zt=zp.length?zp.map(p=>[p[0],zp[0][1]*Math.pow(p[0],-(1+P.gamma))]):[];
+  loglog($('c-zipf'),{xmin:1,xmax:K,series:[{pts:zt,color:C.hot,kind:'line',dash:true},{pts:zp,color:C.amber,kind:'dots'}]});
+  const sp=Sser.filter((p,i)=>i%Math.max(1,Math.floor(Sser.length/120))===0||i===Sser.length-1);
+  const mu=slope(Sser.filter(p=>p[0]>=t/2));
+  $('m-mu').textContent=isFinite(mu)?mu.toFixed(2)+' (atteso '+(1/(1+P.gamma)).toFixed(2)+')':'–';
+  let st=[];if(Sser.length){const last=Sser[Sser.length-1],m=1/(1+P.gamma);st=sp.map(p=>[p[0],last[1]*Math.pow(p[0]/last[0],m)]);}
+  loglog($('c-s'),{xmin:1,xmax:WARMUP+T_MAX,series:[{pts:st,color:C.hot,kind:'line',dash:true},{pts:sp,color:C.amber,kind:'line'}]});
+}
+
+/* ---------- controlli ---------- */
+const keys=['beta','kappa','dr0','rho','gamma'];
+const SMIN=0.2,SMAX=300;
+function fmtSpeed(v){
+  const ps=v<1?(1/v).toFixed(1)+' s/passo':v.toFixed(v<10?1:0)+' passi/s';
+  const d=v/stepsPerDay();
+  return ps+' · '+(d>=1?(d.toFixed(1)==='1.0'?'1 giorno/s':d.toFixed(d<10?1:0)+' giorni/s'):'1 giorno ogni '+(1/d).toFixed(1)+' s');
+}
+const fmtL=v=>v>=1e9?(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' miliardi di L':v>=1e6?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni di L':v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' L';
+const fmtPop=v=>v>=1e6?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni':Math.round(v/1000).toLocaleString('it-IT')+' mila';
+// livelli della mappa attivabili con i pulsanti
+const SHOW={dens:false,pump:true,pp:true};
+for(const [id,key] of [['show-dens','dens'],['show-pump','pump'],['show-pp','pp']])
+  $(id).addEventListener('click',()=>{SHOW[key]=!SHOW[key];$(id).setAttribute('aria-pressed',SHOW[key]?'true':'false');});
+
+/* ---------- densità di persone ----------
+   la mappa è divisa in una griglia di 25 x 25 celle; in ogni cella si conta quante persone ci sono,
+   con una media mobile sugli ultimi ~50 passi (giorno e notte insieme), poi si riporta alla popolazione reale:
+   densità = persone medie nella cella × persone rappresentate da ogni puntino ÷ area della cella in km² */
+const DG=25;let DENS=new Float32Array(DG*DG),topDens=null;
+function densReset(){DENS=new Float32Array(DG*DG);topDens=null;}
+const cellKm=()=>WORLD/DG;
+function densUpdate(ds){
+  if(ds<=0)return;
+  const a=Math.min(1,0.02*ds),cnt=new Float32Array(DG*DG),c=cellKm();
+  for(const b of agents){const l=b.locs[b.cur];const i=Math.min(DG-1,Math.max(0,Math.floor(l.x/c))),j=Math.min(DG-1,Math.max(0,Math.floor(l.y/c)));cnt[j*DG+i]++;}
+  for(let k=0;k<DENS.length;k++)DENS[k]+=(cnt[k]-DENS[k])*a;
+}
+function densCells(){
+  const c=cellKm(),area=c*c,k=popScale(),out=[];
+  // nome della cella: il luogo più frequente tra le persone che ci sono adesso, altrimenti il centro
+  const names=new Map();
+  for(const b of agents){const l=b.locs[b.cur];const i=Math.min(DG-1,Math.max(0,Math.floor(l.x/c))),j=Math.min(DG-1,Math.max(0,Math.floor(l.y/c)));
+    const nm=townOf(l.x,l.y);if(!nm)continue;const key=j*DG+i;let m=names.get(key);if(!m){m=new Map();names.set(key,m);}m.set(nm,(m.get(nm)||0)+1);}
+  for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){const v=DENS[j*DG+i];if(v<0.02)continue;
+    const x=(i+0.5)*c,y=(j+0.5)*c,m=names.get(j*DG+i);
+    const name=m?[...m.entries()].sort((p,q)=>q[1]-p[1])[0][0]:(townOf(x,y)||'campagna');
+    out.push({i,j,x,y,v,d:v*k/area,name});}
+  return out.sort((p,q)=>q.v-p.v);
+}
+function updateDensity(){
+  const cs=densCells();topDens=cs[0]||null;
+  if(!topDens){$('dens').innerHTML='<p class="fuelnote">In attesa di dati…</p>';return;}
+  const c=cellKm(),max=topDens.d;
+  $('dens').innerHTML=cs.slice(0,5).map((z,n)=>
+    '<div class="zone'+(n===0?' lead dlead':'')+'"><div class="pnl"><span>'+z.name+'</span><b>'+Math.round(z.d).toLocaleString('it-IT')+' ab./km²</b></div>'+
+    '<div class="bar"><div style="width:'+(z.d/max*100)+'%"></div></div>'+
+    '<small>circa '+fmtPop(z.v*popScale())+' persone in media in un quadrato di '+c.toFixed(1)+' × '+c.toFixed(1)+' km</small></div>').join('');
+  $('dens-note').textContent='Il quadrato più denso è evidenziato in azzurro sulla mappa, e le altre celle sono colorate in base alla densità. È la presenza media nelle ultime settimane simulate, giorno e notte insieme: di notte quasi tutti sono a casa, quindi pesano molto le zone dove si abita. Con '+agents.length+' persone simulate le celle piccole sono rumorose.';
+}
+const popScale=()=>MAPDEFS[curMap].pop/Math.max(1,agents.length);   // persone reali per ogni puntino
+function updatePop(){
+  const d=MAPDEFS[curMap];
+  $('pop-val').textContent=fmtPop(d.pop);
+  $('pop-parts').innerHTML=d.popParts.map(q=>'<span>'+q[0]+'</span><span>'+fmtPop(q[1])+'</span>').join('');
+  $('pop-note').textContent='Si simulano '+agents.length+' persone: ogni puntino ne rappresenta circa '+Math.round(popScale()).toLocaleString('it-IT')+', e le case sono distribuite con le stesse proporzioni. Valori approssimati dai censimenti recenti.';
+}
+/* ---------- zone a maggior consumo ----------
+   ogni persona appartiene alla zona dove abita; per ogni zona: litri per abitante al giorno */
+let topZone=null,topPP=null;   // topZone: consumo totale più alto; topPP: consumo a testa più alto
+function zoneStats(){
+  const Z=new Map();
+  for(const a of agents){
+    const h=a.locs[0];let z=Z.get(a.zone);
+    if(!z){z={name:a.zone,n:0,fuel:0,sx:0,sy:0,fx:0,fy:0,homes:[]};Z.set(a.zone,z);}
+    z.n++;z.fuel+=a.fuel;z.sx+=h.x;z.sy+=h.y;z.fx+=a.fuel*h.x;z.fy+=a.fuel*h.y;z.homes.push(h);
+  }
+  const dd=Math.max(days,1e-9),out=[...Z.values()];
+  for(const z of out){z.pp=z.fuel/z.n/dd;z.x=z.sx/z.n;z.y=z.sy/z.n;z.px=z.fuel>0?z.fx/z.fuel:z.x;z.py=z.fuel>0?z.fy/z.fuel:z.y;z.r=Math.max(2,...z.homes.map(h=>Math.hypot(h.x-z.x,h.y-z.y)))+1;}
+  return out.sort((a,b)=>b.pp-a.pp);
+}
+/* ---------- densità contro consumo ----------
+   per ogni zona: densità media dei quadrati dove abitano i suoi residenti (ab./km²)
+   e litri per abitante al giorno; correlazione tra log(densità) e consumo, pesata sul numero di residenti */
+const cellOf=(x,y)=>{const c=cellKm();return Math.min(DG-1,Math.max(0,Math.floor(y/c)))*DG+Math.min(DG-1,Math.max(0,Math.floor(x/c)));};
+function updateCompare(){
+  const cv=$('cmp');
+  if(days<1||!topDens){$('cmp-text').innerHTML='<p class="fuelnote">In attesa del primo giorno simulato…</p>';return;}
+  const c=cellKm(),area=c*c,k=popScale(),dd=Math.max(days,1e-9);
+  const zs=zoneStats().map(z=>{let d=0;for(const h of z.homes)d+=DENS[cellOf(h.x,h.y)]*k/area;return Object.assign(z,{dens:d/z.homes.length});}).filter(z=>z.dens>0);
+  if(zs.length<3){$('cmp-text').innerHTML='<p class="fuelnote">Servono più zone abitate per il confronto…</p>';return;}
+  // correlazione pesata tra log10(densità) e consumo
+  let W=0,mx=0,my=0;for(const z of zs){const w=z.n;W+=w;mx+=w*Math.log10(z.dens);my+=w*z.pp;}mx/=W;my/=W;
+  let sxy=0,sxx=0,syy=0;for(const z of zs){const w=z.n,dx=Math.log10(z.dens)-mx,dy=z.pp-my;sxy+=w*dx*dy;sxx+=w*dx*dx;syy+=w*dy*dy;}
+  const r=sxx>0&&syy>0?sxy/Math.sqrt(sxx*syy):0,slope=sxx>0?sxy/sxx:0;
+  // terzo più denso contro terzo meno denso, per abitanti
+  const byD=zs.slice().sort((a,b)=>b.dens-a.dens),tot=W;let acc=0;const hi=[],lo=[];
+  for(const z of byD){if(acc<tot/3)hi.push(z);acc+=z.n;}
+  acc=0;for(const z of byD.slice().reverse()){if(acc<tot/3)lo.push(z);acc+=z.n;}
+  const avgPP=g=>g.reduce((s,z)=>s+z.fuel,0)/Math.max(1,g.reduce((s,z)=>s+z.n,0))/dd;
+  const pHi=avgPP(hi),pLo=avgPP(lo);
+  // residenti del quadrato più denso
+  const key=topDens.j*DG+topDens.i,res=agents.filter(a=>cellOf(a.locs[0].x,a.locs[0].y)===key);
+  const resPP=res.length?res.reduce((s,a)=>s+a.fuel,0)/res.length/dd:NaN;
+  const topF=zs.slice().sort((a,b)=>b.fuel-a.fuel)[0];
+  const densest=byD[0];
+  // grafico: x = densità (scala log), y = litri per abitante al giorno
+  const ctx=prepCanvas(cv),Wd=cv.width,H=cv.height;ctx.clearRect(0,0,Wd,H);
+  const L=40*DPR,R=10*DPR,T=10*DPR,B=24*DPR;
+  const lx0=Math.floor(Math.log10(Math.min(...zs.map(z=>z.dens)))),lx1=Math.ceil(Math.log10(Math.max(...zs.map(z=>z.dens))))+(0);
+  const x1=lx1>lx0?lx1:lx0+1,ymax=Math.max(...zs.map(z=>z.pp))*1.15||1;
+  const X=d=>L+(Math.log10(d)-lx0)/(x1-lx0)*(Wd-L-R),Y=v=>T+(1-v/ymax)*(H-T-B);
+  ctx.strokeStyle=C.line;ctx.lineWidth=1;ctx.fillStyle=C.dim;ctx.font=(10*DPR)+'px JetBrains Mono, monospace';
+  for(let e=lx0;e<=x1;e++){const x=X(Math.pow(10,e)),lb=Math.pow(10,e).toLocaleString('it-IT'),tw=ctx.measureText(lb).width;ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,H-B);ctx.stroke();ctx.fillText(lb,Math.min(Wd-R-tw,Math.max(L,x-tw/2)),H-8*DPR);}
+  for(let q=0;q<=4;q++){const v=ymax*q/4,y=Y(v);ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(Wd-R,y);ctx.stroke();ctx.fillText(v.toFixed(1),2*DPR,y+3*DPR);}
+  // retta di tendenza
+  ctx.strokeStyle=C.dim;ctx.setLineDash([4*DPR,3*DPR]);ctx.lineWidth=1.4*DPR;ctx.beginPath();
+  for(let q=0;q<=20;q++){const le=lx0+(x1-lx0)*q/20,v=my+slope*(le-mx);const px=X(Math.pow(10,le)),py=Y(Math.max(0,Math.min(ymax,v)));if(q)ctx.lineTo(px,py);else ctx.moveTo(px,py);}
+  ctx.stroke();ctx.setLineDash([]);
+  for(const z of zs){const col=z===densest?C.ret:z===topF?C.hot:C.amber;ctx.fillStyle=rgba(col,0.85);ctx.beginPath();ctx.arc(X(z.dens),Y(z.pp),Math.max(2.5,Math.sqrt(z.n)*2.4)*DPR,0,7);ctx.fill();}
+  ctx.font='600 '+(10*DPR)+'px Space Grotesk, sans-serif';
+  for(const z of [densest,topF]){ctx.fillStyle=z===densest?C.ret:C.hot;const x=X(z.dens),tw=ctx.measureText(z.name).width;ctx.fillText(z.name,Math.min(Wd-R-tw,Math.max(L,x-tw/2)),Y(z.pp)-8*DPR);}
+  ctx.fillStyle=C.dim;ctx.font=(9*DPR)+'px Space Grotesk, sans-serif';{const t='ab./km² →',tw=ctx.measureText(t).width;ctx.fillText(t,Wd-R-tw-2*DPR,T+10*DPR);}ctx.fillText('L/ab. al giorno',L+4*DPR,T+10*DPR);
+  const fmt1=v=>v.toLocaleString('it-IT',{maximumFractionDigits:1}),fmtD=v=>Math.round(v).toLocaleString('it-IT');
+  const verdict=Math.abs(r)<0.2?'nessun legame chiaro tra densità e consumo':r<0?'dove si vive più fitti si consuma meno carburante':'dove si vive più fitti si consuma più carburante';
+  const diff=pLo>0?(pHi/pLo-1)*100:0;
+  $('cmp-text').innerHTML=
+    '<p>Quadrato più denso: <b>'+topDens.name+'</b>, '+fmtD(topDens.d)+' ab./km². '+(isFinite(resPP)?'Chi ci abita consuma <b>'+fmt1(resPP)+' L</b> a testa al giorno.':'Nessun residente simulato vi abita: è densa per chi ci passa.')+'</p>'+
+    '<p>Zona che consuma di più in totale: <b>'+topF.name+'</b>, '+fmtL(topF.fuel/dd*k)+' al giorno ('+fmt1(topF.pp)+' L a testa), con una densità di '+fmtD(topF.dens)+' ab./km².</p>'+
+    '<p>Il terzo di abitanti che vive nelle zone più dense consuma <b>'+fmt1(pHi)+' L</b> a testa al giorno, il terzo che vive nelle meno dense <b>'+fmt1(pLo)+' L</b> ('+(diff>=0?'+':'')+diff.toFixed(0)+'%).</p>'+
+    '<p>Correlazione tra densità e consumo: <b>r = '+r.toFixed(2)+'</b>, '+verdict+'.</p>';
+}
+// dove conviene un distributore: conta il carburante totale dei residenti (consumo a testa × abitanti);
+// il punto consigliato è il baricentro delle case pesato su quanto consuma ciascuno
+function updateZones(){
+  if(days<1){$('zones').innerHTML='<p class="fuelnote">In attesa del primo giorno simulato…</p>';topZone=null;topPP=null;return;}
+  const k=popScale(),dd=Math.max(days,1e-9),zs=zoneStats().sort((a,b)=>b.fuel-a.fuel),max=zs[0].fuel||1,all=zs.reduce((s,z)=>s+z.fuel,0)||1;
+  topZone=zs[0];
+  topPP=zs.slice().sort((a,b)=>b.pp-a.pp)[0];
+  $('zones').innerHTML=zs.slice(0,5).map((z,i)=>
+    '<div class="zone'+(i===0?' lead':'')+'"><div class="pnl"><span>'+z.name+'</span><b>'+fmtL(z.fuel/dd*k)+' al giorno</b></div>'+
+    '<div class="bar"><div style="width:'+(z.fuel/max*100)+'%"></div></div>'+
+    '<small>'+z.pp.toLocaleString('it-IT',{maximumFractionDigits:1})+' L a testa × circa '+fmtPop(z.n*k)+(z.n*k>=1e6?' di':'')+' abitanti · '+(z.fuel/all*100).toFixed(0)+'% di tutto il carburante</small></div>').join('');
+  $('zones-note').textContent='La classifica è per carburante totale consumato dai residenti, cioè consumo a testa per numero di abitanti: dove la domanda è più alta conviene un distributore. Sulla mappa la zona in cima è cerchiata e il simbolo della pompa indica il punto consigliato, al centro delle case pesato su quanto consuma ciascuno. Con '+agents.length+' persone simulate la classifica si stabilizza dopo qualche settimana simulata.';
+}
+/* ---------- CO₂: litri bruciati × kg di CO₂ per litro ---------- */
+const CO2_CAR=2.35,CO2_AIR=2.52;
+const co2Of=(lCar,lAir)=>lCar*CO2_CAR+lAir*CO2_AIR;
+const fmtKg=v=>v<1000?v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' kg':v<1e6?(v/1000).toLocaleString('it-IT',{maximumFractionDigits:1})+' t':v<1e9?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' mila t':(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni di t';
+function updateCO2(){
+  const dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale();
+  const tot=co2Of(fuel-fuelAir,fuelAir),air=co2Of(0,fuelAir),ratio=fuel>0?tot/fuel:CO2_CAR;
+  $('co2-rate').textContent=days>0.5?fmtKg(tot/Math.max(days,1e-9)*k/86400)+'/s':'– kg/s';
+  const ppd=tot/dd/n;
+  $('co2').innerHTML=
+    '<span>Totale</span><span>'+fmtKg(tot*k)+'</span>'+
+    (CANFLY?'<span>Di cui dai voli</span><span>'+fmtKg(air*k)+' ('+(tot>0?(air/tot*100).toLocaleString('it-IT',{maximumFractionDigits:1}):'0')+'%)</span>':'')+
+    '<span>Al giorno</span><span>'+(days>0.5?fmtKg(tot/dd*k):'–')+'</span>'+
+    '<span>Per persona al giorno</span><span>'+(days>0.5?ppd.toLocaleString('it-IT',{maximumFractionDigits:2})+' kg':'–')+'</span>'+
+    '<span>Per persona all\'anno</span><span>'+(days>0.5?(ppd*365/1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' t':'–')+'</span>';
+}
+function updateFuel(){
+  const md=MAPDEFS[curMap],dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale();
+  // consumo reale al secondo: litri al giorno simulato diviso gli 86.400 secondi di un giorno, non dipende dalla velocità dell'animazione
+  const rate=days>0.5?fuel/dd*k/86400:0;
+  $('fuel-rate').textContent=(days>0.5?rate.toLocaleString('it-IT',{maximumFractionDigits:rate<10?2:1})+' L/s':'– L/s');
+  const ok=days>0.5,row=(l,v)=>'<span>'+l+'</span><span>'+v+'</span>',grp=t=>'<div class="grp">'+t+'</div>';
+  const pct=fuelElev/(fuel-fuelAir-fuelElev||1)*100;
+  $('fuel').innerHTML=
+    row('Totale',fmtL(fuel*k))+
+    row('Al giorno',ok?fmtL(fuel/dd*k):'–')+
+    row('Per persona al giorno',ok?(fuel/dd/n).toLocaleString('it-IT',{maximumFractionDigits:2})+' L':'–')+
+    grp('Dislivello')+
+    row('Carburante in più',fuel>0?(fuelElev>=0?'+':'−')+fmtL(Math.abs(fuelElev)*k):'–')+
+    row('Sul consumo in auto',fuel>0?(pct>=0?'+':'')+pct.toLocaleString('it-IT',{maximumFractionDigits:1})+'%':'–')+
+    row('Salita per persona al giorno',ok?Math.round(climbM/dd/n)+' m':'–')+
+    (CANFLY?grp('Voli')+row('Carburante in volo',fmtL(fuelAir*k))+row('Ore di volo',fmtH(airH*k))+row('Ore di volo al giorno',ok?fmtH(airH*k/dd):'–'):'');
+  updateCO2();
+  $('fuel-note').innerHTML='<ul>'+
+    '<li>Auto in piano: '+md.l100.toLocaleString('it-IT')+' l/100 km a '+md.car+' km/h di media.</li>'+
+    '<li>Salita: '+(K_UP*1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' ml per metro (m·g / η·E, auto da '+CAR_KG+' kg, rendimento '+ETA*100+'%, 32 MJ/l); in discesa se ne recupera metà. Quote interpolate tra quote reali.</li>'+
+    (CANFLY?'<li>Volo in '+md.airName+': '+md.airL.toLocaleString('it-IT')+' l per passeggero al km, a '+md.airKmh+' km/h.</li>':'')+
+    '<li>Valori riferiti a tutta la popolazione. Il numero in grande è il consumo reale al secondo: litri al giorno ÷ 86.400 secondi, indipendente dalla velocità della simulazione.</li></ul>';
+}
+function updateTime(){
+  const d=MAPDEFS[curMap],km2=d.world*d.world;
+  $('o-speed').textContent=fmtSpeed(P.speed);
+  $('timeinfo').textContent='Mappa di '+d.world+' × '+d.world+' km ('+km2.toLocaleString('it-IT')+' km²). Un passo è uno spostamento in auto: in media '+d.tripRef.toFixed(1)+' km a '+d.car+' km/h, cioè '+Math.round(tripMin())+' minuti (media di riferimento su un ciclo completo; finora il viaggio medio misurato è '+tripKm().toFixed(1)+' km). Con circa '+DRIVE_MIN+' minuti di guida al giorno fanno '+stepsPerDay().toFixed(1)+' passi al giorno; l\'ultimo di ogni giornata riporta a casa per la notte ('+NIGHT_H+' ore). Prima di iniziare a contare, ogni ciclo fa '+WARMUP+' passi di riscaldamento, così le persone partono con abitudini già consolidate.';
+}
+let resetTimer=null;
+function syncUI(){
+  keys.forEach(k=>{$(k).value=P[k];$('o-'+k).textContent=(k==='N'||k==='kappa')?P[k]:(+P[k]).toFixed(2);});
+  $('e-beta').textContent=(+P.beta).toFixed(2);$('e-kappa').textContent=P.kappa;$('e-dr0').textContent=(+P.dr0).toFixed(1);
+  $('e-rho').textContent=(+P.rho).toFixed(2);$('e-gamma').textContent=(+P.gamma).toFixed(2);
+  $('e-zeta').textContent=(1+ +P.gamma).toFixed(2);$('e-mu').textContent=(1/(1+ +P.gamma)).toFixed(2);
+  $('speed').value=Math.round(Math.log(P.speed/SMIN)/Math.log(SMAX/SMIN)*100);
+  $('o-speed').textContent=fmtSpeed(P.speed);
+}
+$('speed').addEventListener('input',()=>{P.speed=SMIN*Math.pow(SMAX/SMIN,$('speed').value/100);$('o-speed').textContent=fmtSpeed(P.speed);});
+keys.forEach(k=>$(k).addEventListener('input',()=>{
+  P[k]=parseFloat($(k).value);syncUI();
+  clearTimeout(resetTimer);resetTimer=setTimeout(()=>{reset();updateWho();},250);
+}));
+$('play').addEventListener('click',()=>{running=!running;$('play').textContent=running?'Pausa':'Avvia';});
+$('reset').addEventListener('click',()=>{reset();updateWho();});
+$('defaults').addEventListener('click',()=>{Object.assign(P,REAL);syncUI();reset();updateWho();});
+
+function loop(ts){
+  const dt=lastTs?Math.min(100,ts-lastTs):0;lastTs=ts;
+  if(running){
+    // al massimo ~8 ms di calcolo per fotogramma: se la velocità richiesta è troppo alta, il resto si recupera dopo
+    pend=Math.min(60,pend+P.speed*dt/1000);const t0=performance.now();
+    while(pend>1e-9){const c=Math.min(pend,0.5);advance(c);densUpdate(c);pend-=c;if(performance.now()-t0>8)break;}
+    pend=Math.min(pend,3);
+  }
+  if(dt>0){fuelRate=fuelRate*0.97+(fuelFrame/(dt/1000))*0.03;}
+  fuelFrame=0;
+  drawMap(ts);
+  const fm=frameN%30;
+  if(fm===0||fm===15)updateWho();
+  if(fm===4||fm===19)updateTime();
+  if(fm===8||fm===23)updateFuel();
+  if(fm===12)drawCharts();
+  if(fm===26)updateZones();
+  if(fm===2)updateDensity();
+  if(fm===17)updateCompare();
+  frameN++;
+  requestAnimationFrame(loop);
+}
+
+const mq=window.matchMedia('(prefers-color-scheme: dark)');
+if(mq.addEventListener)mq.addEventListener('change',()=>{readColors();renderTerrain();});
+window.addEventListener('resize',sizeMap);
+
+function setMap(key){
+  const d=MAPDEFS[key];
+  WORLD=d.world;
+  if(!MAPS[key])MAPS[key]=d.build();
+  MAP=MAPS[key];NODES=MAP.NODES;CANFLY=MAP.CANFLY;curMap=key;
+  $('title').textContent=d.title;$('desc').textContent=d.desc;document.title=d.title;
+  document.querySelectorAll('.maps button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.map===key?'true':'false'));
+  sel=0;sizeMap();reset();updateWho();updatePop();
+}
+document.querySelectorAll('.maps button').forEach(b=>b.addEventListener('click',()=>{
+  if(MAP===MAPS[b.dataset.map])return;
+  $('desc').textContent='Costruzione della rete stradale…';
+  setTimeout(()=>setMap(b.dataset.map),30);
+}));
+readColors();syncUI();setMap('ny');requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
