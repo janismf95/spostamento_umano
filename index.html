@@ -116,7 +116,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 <header>
   <h1 id="title"></h1>
   <p id="desc"></p>
-  <div class="maps" role="group" aria-label="Mappa"><button data-map="ny" aria-pressed="true">New York</button><button data-map="london" aria-pressed="false">Londra</button><button data-map="fvg" aria-pressed="false">Friuli Venezia Giulia</button></div>
+  <div class="maps" role="group" aria-label="Mappa"><button data-map="ny" aria-pressed="true">New York</button><button data-map="london" aria-pressed="false">Londra</button><button data-map="fvg" aria-pressed="false">Friuli Venezia Giulia</button><button data-map="roma" aria-pressed="false">Roma</button></div>
 </header>
 
 <div class="top">
@@ -124,7 +124,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
   <div class="mapbox">
     <canvas id="map" aria-label="Mappa degli spostamenti"></canvas>
     <div class="hud" id="hud"></div>
-    <div class="maplegend"><span><i style="background:var(--amber)"></i>esplora</span><span><i style="background:var(--ret)"></i>torna</span><span><i style="background:var(--air)"></i>in volo</span></div>
+    <div class="maplegend"><span><i style="background:var(--amber)"></i>esplora</span><span><i style="background:var(--ret)"></i>torna</span><span><i style="background:var(--air)"></i>in volo</span><span>— auto</span><span>– – mezzi pubblici</span><span>·· a piedi o bici</span></div>
     <div class="hint">Tocca la mappa per seguire una persona</div>
   </div>
   <div class="speedbar">
@@ -133,7 +133,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
     <input type="range" id="speed" min="0" max="100" step="1">
     <output id="o-speed"></output>
   </div>
-  <div class="layers" role="group" aria-label="Livelli della mappa"><span>Mostra sulla mappa:</span><button id="show-dens" aria-pressed="false">Densità massima</button><button id="show-pump" aria-pressed="true">Distributore consigliato</button><button id="show-pp" aria-pressed="true">Consumo massimo a testa</button></div>
+  <div class="layers" role="group" aria-label="Livelli della mappa"><span>Mostra sulla mappa:</span><button id="show-dens" aria-pressed="false">Densità massima</button><button id="show-pump" aria-pressed="true">Distributore consigliato</button><button id="show-heat" aria-pressed="false">Calore</button><button id="show-traf" aria-pressed="false">Traffico</button><button id="show-pp" aria-pressed="true">Consumo massimo a testa</button></div>
   <p class="timeinfo" id="timeinfo"></p>
   </div>
 
@@ -158,6 +158,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
       <h2>Emissioni di CO₂</h2>
       <div class="fuelrate" id="co2-rate">0 kg/s</div>
       <div class="kv" id="co2"></div>
+      <div class="kv" id="co2-real"></div>
+      <div class="btns" id="calib-box" style="margin-top:8px;display:none;align-items:center"><label class="chk" style="margin:0 8px 0 0"><input type="checkbox" id="calib-auto"> Taratura automatica</label><button id="calib-btn">Tara la simulazione su questo dato</button></div>
       <p class="fuelnote">Calcolate dal carburante bruciato: 2,35 kg di CO₂ per litro per le auto (media tra benzina, 2,3 kg/l, e gasolio, 2,65 kg/l) e 2,52 kg per litro per il carburante degli aerei. Come per il carburante, i valori sono riferiti a tutta la popolazione, e il numero in grande è la CO₂ emessa in ogni secondo reale (al giorno ÷ 86.400), indipendente dalla velocità della simulazione.</p>
     </div>
 
@@ -166,6 +168,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
       <div class="fuelrate" id="kwh-rate">– kWh/h</div>
       <div class="kv" id="kwh"></div>
       <div class="fuelnote" id="kwh-note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Effetto locale: calore</h2>
+      <div class="fuelrate" id="heat-rate">– W/m²</div>
+      <div class="kv" id="heat"></div>
+      <div class="fuelnote" id="heat-note"></div>
     </div>
 
     <div class="card">
@@ -249,9 +258,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-const REAL={beta:1.75,kappa:20,dr0:1.5,rho:0.6,gamma:0.21,N:60,speed:4};   // N: persone simulate, ognuna rappresenta una quota della popolazione reale
+const REAL={beta:1.75,kappa:20,dr0:1.5,rho:0.6,gamma:0.21,N:150,speed:4};   // N: persone simulate, ognuna rappresenta una quota della popolazione reale
 const P=Object.assign({},REAL);
-let WORLD=55;const T_MAX=4000,WARMUP=2000;   // WARMUP: passi di riscaldamento non contati all'inizio di ogni ciclo
+let WORLD=55;const T_MAX=4000,WARMUP=1000;   // WARMUP: passi di riscaldamento non contati all'avvio (T_MAX non è più usato: la simulazione non riparte)
 const PHI=(1+Math.sqrt(5))/2, GA=2*Math.PI/(PHI*PHI);
 const NB=34, RMIN=0.05, RMAX=120;
 const EDGES=[];for(let i=0;i<=NB;i++)EDGES.push(RMIN*Math.pow(RMAX/RMIN,i/NB));
@@ -512,7 +521,7 @@ function buildNewYork(){
     if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
     ECACHE.set(key,z);return z;
   }
-  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+  return {NODES,ADJ,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
 }
 function buildLondra(){
   /* ---------- territorio: Londra e dintorni ----------
@@ -776,7 +785,7 @@ function buildLondra(){
     if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
     ECACHE.set(key,z);return z;
   }
-  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+  return {NODES,ADJ,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
 }
 function buildFriuli(){
   /* ---------- territorio: Friuli Venezia Giulia ----------
@@ -1067,13 +1076,273 @@ function buildFriuli(){
     if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
     ECACHE.set(key,z);return z;
   }
-  return {NODES,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+  return {NODES,ADJ,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
+}
+
+function buildRoma(){
+  /* ---------- territorio: Roma e dintorni ----------
+     coordinate reali convertite in km; 1 unità = 1 km */
+  const geo=(lat,lon)=>[(lon-12.47)*82.9+35,(41.86-lat)*111.2+35];
+  const LL=a=>a.map(p=>geo(p[0],p[1]));
+  const ROMA=(()=>{const p=geo(41.893,12.49);return {x:p[0],y:p[1],r:9,step:1,street:0.25};})();   // dentro il Grande Raccordo Anulare
+  const RIVER_W=0.18;
+  const RIVERS=[
+    {n:'Tevere',pts:LL([[42.175,12.60],[42.10,12.58],[42.05,12.56],[42.00,12.53],[41.96,12.50],[41.935,12.467],[41.92,12.462],[41.905,12.468],[41.890,12.478],[41.880,12.475],[41.862,12.470],[41.85,12.455],[41.835,12.43],[41.81,12.40],[41.78,12.35],[41.76,12.31],[41.745,12.27],[41.738,12.236]])},
+    {n:'Aniene',pts:LL([[41.958,12.815],[41.95,12.72],[41.94,12.66],[41.93,12.60],[41.935,12.53],[41.94,12.50]])}
+  ];
+  // ponti di Roma sul Tevere e sull'Aniene
+  const RBRIDGES=LL([[41.935,12.467],[41.927,12.464],[41.913,12.468],[41.904,12.474],[41.901,12.467],[41.891,12.473],[41.880,12.475],[41.865,12.468],[41.85,12.455],[41.94,12.50],[41.932,12.53],[41.925,12.57]]);
+  // mar Tirreno: costa da nord-ovest a sud-est, poi chiusura sul bordo
+  const SEA=LL([[42.10,11.90],[41.955,12.07],[41.85,12.195],[41.77,12.225],[41.738,12.236],[41.725,12.28],[41.67,12.38],[41.62,12.46],[41.56,12.55],[41.50,12.60],[41.50,11.90]]);
+  const CIRCLES=[
+    {p:geo(42.12,12.23),r:4.3,t:'lago',n:'Lago di Bracciano'},
+    {p:geo(41.75,12.665),r:1.1,t:'lago',n:'Lago Albano'},
+    {p:geo(41.751,12.708),r:2.8,t:'monti',n:'Colli Albani'},
+    {p:geo(42.04,12.86),r:5,t:'monti',n:'Monti Tiburtini'},
+    {p:geo(42.16,12.10),r:4,t:'monti',n:'Monti Sabatini'}
+  ].map(c=>({x:c.p[0],y:c.p[1],r:c.r,t:c.t,n:c.n}));
+  const TOWNS=[['Ostia',41.733,12.29],['Fiumicino',41.772,12.24],['Fregene',41.85,12.205],['Ladispoli',41.954,12.085],['Cerveteri',41.99,12.10],
+    ['Pomezia',41.67,12.50],['Torvaianica',41.625,12.465],['Ciampino',41.80,12.60],['Frascati',41.807,12.681],['Marino',41.77,12.66],
+    ['Castel Gandolfo',41.749,12.645],['Albano Laziale',41.729,12.659],['Velletri',41.687,12.777],['Tivoli',41.963,12.798],['Guidonia',42.0,12.73],
+    ['Monterotondo',42.052,12.616],['Fonte Nuova',42.0,12.62],['Anguillara',42.09,12.27],['Bracciano',42.10,12.175],['La Storta',42.0,12.38]]
+    .map(t=>{const p=geo(t[1],t[2]);return {n:t[0],x:p[0],y:p[1]};});
+  // Fiumicino e Ciampino più l'aeroporto dell'Urbe (aviazione generale ed elicotteri, dentro la città):
+  // si vola solo tra l'Urbe e uno dei due aeroporti, come le navette in elicottero
+  const AIRPORTS=[['Fiumicino Airport',41.8003,12.2389,'air'],['Ciampino Airport',41.7994,12.5949,'air'],['Aeroporto dell\'Urbe',41.952,12.51,'heli']]
+    .map(a=>{const p=geo(a[1],a[2]);return {n:a[0],x:p[0],y:p[1],type:a[3]};});
+  const AIR_K=0.2,FLY_MIN=12,AIR_MIN=10,AIR_WAIT=8;   // AIR_WAIT: costo fisso di imbarco, in km equivalenti
+  const airOK=(i,j)=>AIRPORTS[i].type!==AIRPORTS[j].type;
+
+  const inRoma=(x,y)=>Math.hypot(x-ROMA.x,y-ROMA.y)<=ROMA.r+0.01;
+  function segDist(px,py,a,b){const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((px-a[0])*vx+(py-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const dx=a[0]+t*vx-px,dy=a[1]+t*vy-py;return Math.sqrt(dx*dx+dy*dy);}
+  function riverDist(x,y){let m=1e9;for(const r of RIVERS)for(let i=1;i<r.pts.length;i++){const d=segDist(x,y,r.pts[i-1],r.pts[i]);if(d<m)m=d;}return m;}
+  const inRiver=(x,y,m)=>riverDist(x,y)<RIVER_W+(m||0);
+  function inSea(x,y){let c=false;for(let i=0,j=SEA.length-1;i<SEA.length;j=i++){const a=SEA[i],b=SEA[j];if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
+  function seaDist(x,y){let m=1e9;for(let i=1;i<SEA.length;i++){const d=segDist(x,y,SEA[i-1],SEA[i]);if(d<m)m=d;}return inSea(x,y)?-m:m;}
+  function inCircle(x,y,m){for(const c of CIRCLES)if((x-c.x)*(x-c.x)+(y-c.y)*(y-c.y)<(c.r+(m||0))*(c.r+(m||0)))return true;return false;}
+  const blocked=(x,y)=>inRiver(x,y,0.2)||inCircle(x,y,0.3)||seaDist(x,y)<0.2;
+
+  /* ---------- rete stradale: ci si muove solo qui ---------- */
+  const NODES=[],ADJ=[],ROADS=[];
+  function addNode(x,y){NODES.push({x:x,y:y,pl:!blocked(x,y)});ADJ.push([]);return NODES.length-1;}
+  function link(u,v){const w=Math.hypot(NODES[u].x-NODES[v].x,NODES[u].y-NODES[v].y);ADJ[u].push([v,w]);ADJ[v].push([u,w]);}
+  function wet(x0,y0,x1,y1){for(let k=0;k<=8;k++)if(inRiver(x0+(x1-x0)*k/8,y0+(y1-y0)*k/8,0.05))return true;return false;}
+  // griglia di Roma dentro il Raccordo (raggio 9 km); sul Tevere e sull'Aniene si passa solo vicino ai ponti
+  const GK=Math.floor(ROMA.r/ROMA.step),GN=2*GK+1;
+  const nX=i=>ROMA.x+(i-GK)*ROMA.step,nY=j=>ROMA.y+(j-GK)*ROMA.step,nid=(i,j)=>i*GN+j;
+  const gridId=[];
+  for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){const x=nX(i),y=nY(j);gridId[nid(i,j)]=(inRoma(x,y)&&!blocked(x,y))?addNode(x,y):-1;}
+  const nearBridge=(x,y)=>RBRIDGES.some(b=>Math.hypot(b[0]-x,b[1]-y)<1.0);
+  for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){
+    const u=gridId[nid(i,j)];if(u<0)continue;
+    for(const d of [[1,0],[0,1]]){
+      const i2=i+d[0],j2=j+d[1];if(i2>=GN||j2>=GN)continue;const v=gridId[nid(i2,j2)];if(v<0)continue;
+      const x0=nX(i),y0=nY(j),x1=nX(i2),y1=nY(j2);
+      if(!wet(x0,y0,x1,y1)||nearBridge((x0+x1)/2,(y0+y1)/2))link(u,v);
+    }
+  }
+  function nl(x,y){let b=-1,bd=1e9;for(let k=0;k<gridId.length;k++){const id=gridId[k];if(id<0)continue;const d=Math.hypot(NODES[id].x-x,NODES[id].y-y);if(d<bd){bd=d;b=id;}}return b;}
+  // paesi: piazza centrale con quattro vie
+  const TID=TOWNS.map(v=>{
+    const c=addNode(v.x,v.y);
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
+      if(blocked(v.x+d[0]*0.8,v.y+d[1]*0.8))continue;
+      let prev=c;for(let k=1;k<=2;k++){const id=addNode(v.x+d[0]*0.4*k,v.y+d[1]*0.4*k);link(prev,id);prev=id;}
+      ROADS.push({w:0.6,pts:[[v.x,v.y],[v.x+d[0]*0.8,v.y+d[1]*0.8]]});}
+    return c;
+  });
+  const T=n=>{const i=TOWNS.findIndex(t=>t.n===n);if(i<0)throw new Error('paese '+n);return TID[i];};
+  const APID=AIRPORTS.map(ap=>addNode(ap.x,ap.y));
+  const AP=n=>APID[AIRPORTS.findIndex(a=>a.n===n)];
+  function road(seq,w){
+    const pts=seq.map(e=>typeof e==='number'?[NODES[e].x,NODES[e].y,e]:geo(e[0],e[1]).concat([-1]));
+    let prev=pts[0][2]>=0?pts[0][2]:addNode(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.round(L/0.8));
+      for(let k=1;k<=n;k++){
+        const id=k===n?(b[2]>=0?b[2]:addNode(b[0],b[1])):addNode(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n);
+        link(prev,id);prev=id;
+      }
+    }
+    ROADS.push({w:w||1,pts:pts});
+  }
+  // Grande Raccordo Anulare: anello di svincoli, ciascuno collegato alla griglia della città
+  const GRA=[['Salaria',42.000,12.51],['Bufalotta',41.985,12.56],['Nomentana',41.965,12.59],['Tiburtina',41.935,12.615],['Prenestina',41.89,12.625],['Casilina',41.865,12.61],
+    ['Anagnina',41.835,12.59],['Appia',41.815,12.555],['Ardeatina',41.80,12.52],['Laurentina',41.795,12.475],['Colombo',41.80,12.445],['Magliana',41.815,12.415],
+    ['Fiumicino',41.835,12.395],['Aurelia',41.885,12.365],['Boccea',41.925,12.365],['Cassia',41.97,12.39],['Flaminia',41.995,12.45]];
+  const J={};for(const [n,la,lo] of GRA)J[n]=addNode(...geo(la,lo));
+  road(GRA.map(g=>J[g[0]]).concat([J[GRA[0][0]]]),1.6);
+  for(const g of GRA){const q=NODES[J[g[0]]];road([J[g[0]],nl(q.x,q.y)],1);}
+  // consolari e autostrade verso i paesi
+  road([J['Fiumicino'],AP('Fiumicino Airport'),T('Fiumicino')],1.4);           // A91 Roma-Fiumicino
+  road([T('Fiumicino'),T('Fregene')],0.9);
+  road([T('Fiumicino'),[41.752,12.27],T('Ostia')],1);                            // ponte della Scafa
+  road([J['Colombo'],[41.77,12.38],T('Ostia')],1.3);                              // via Cristoforo Colombo
+  road([T('Ostia'),[41.69,12.37],T('Torvaianica')],1);                            // litoranea
+  road([J['Laurentina'],[41.73,12.49],T('Pomezia')],1.3);                         // Pontina
+  road([T('Pomezia'),T('Torvaianica')],0.9);
+  road([J['Anagnina'],AP('Ciampino Airport'),T('Ciampino'),T('Frascati')],1.2);   // Anagnina e Tuscolana
+  road([J['Appia'],[41.785,12.61],T('Marino'),T('Castel Gandolfo'),T('Albano Laziale')],1.2);   // Appia
+  road([T('Albano Laziale'),[41.70,12.70],T('Velletri')],1);
+  road([T('Frascati'),T('Marino')],0.9);
+  road([T('Ciampino'),T('Marino')],0.9);
+  road([J['Casilina'],[41.84,12.75],[41.80,12.89]],1.2);                          // Casilina verso est
+  road([J['Tiburtina'],[41.96,12.68],T('Guidonia'),T('Tivoli')],1.3);            // Tiburtina e A24
+  road([J['Nomentana'],T('Fonte Nuova'),T('Monterotondo')],1);                   // Nomentana
+  road([J['Salaria'],[42.03,12.55],T('Monterotondo'),[42.17,12.62]],1.4);        // Salaria e A1
+  road([J['Flaminia'],[42.08,12.48],[42.17,12.50]],1.1);                          // Flaminia
+  road([J['Cassia'],T('La Storta'),[42.05,12.32],T('Anguillara'),[42.065,12.21],T('Bracciano')],1.1);   // Cassia e Braccianese
+  road([J['Aurelia'],[41.93,12.25],T('Cerveteri'),T('Ladispoli'),[42.03,12.00]],1.3);    // Aurelia
+  road([T('Ladispoli'),[41.90,12.15],T('Fregene')],0.9);
+  for(const a of APID){const ap=NODES[a];if(ADJ[a].length)continue;let b=-1,bd=1e9;for(let k=0;k<NODES.length;k++){if(k===a)continue;const d=Math.hypot(NODES[k].x-ap.x,NODES[k].y-ap.y);if(d<bd){bd=d;b=k;}}if(b>=0)link(a,b);}
+
+  // percorsi minimi tra tutte le coppie di nodi (Dijkstra da ogni nodo)
+  const NN=NODES.length,RD=new Float32Array(NN*NN),RNX=new Int16Array(NN*NN);
+  (function(){
+    const dist=new Float64Array(NN),par=new Int32Array(NN),heap=[];
+    const push=(d,v)=>{heap.push([d,v]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;const t=heap[p];heap[p]=heap[i];heap[i]=t;i=p;}};
+    const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;const t=heap[m];heap[m]=heap[i];heap[i]=t;i=m;}}return top;};
+    for(let v=0;v<NN;v++){
+      dist.fill(Infinity);par.fill(-1);dist[v]=0;par[v]=v;heap.length=0;push(0,v);
+      while(heap.length){const [d,u]=pop();if(d>dist[u])continue;
+        for(const [w,c] of ADJ[u]){const nd=d+c;if(nd<dist[w]){dist[w]=nd;par[w]=u;push(nd,w);}}}
+      for(let u=0;u<NN;u++){RD[u*NN+v]=dist[u];RNX[u*NN+v]=par[u];}
+    }
+  })();
+  // aggancio dei luoghi al nodo stradale più vicino (entro 1.6 km)
+  const SNAP=1.6,BK=2,BW=Math.ceil(WORLD/BK),BUCK=[];
+  for(let k=0;k<BW*BW;k++)BUCK.push([]);
+  NODES.forEach((nd,k)=>{if(nd.pl&&nd.x>=0&&nd.y>=0&&nd.x<WORLD&&nd.y<WORLD)BUCK[Math.floor(nd.y/BK)*BW+Math.floor(nd.x/BK)].push(k);});
+  function place(x,y){
+    if(x<0||x>WORLD||y<0||y>WORLD)return -1;
+    const bx=Math.floor(x/BK),by=Math.floor(y/BK);let best=-1,bd=SNAP*SNAP;
+    for(let j=by-1;j<=by+1;j++)for(let i=bx-1;i<=bx+1;i++){if(i<0||j<0||i>=BW||j>=BW)continue;
+      for(const k of BUCK[j*BW+i]){const dx=NODES[k].x-x,dy=NODES[k].y-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}}
+    return best;
+  }
+  function pathNodes(u,v){const out=[u];let k=u,g=0;while(k!==v&&g++<NN){k=RNX[k*NN+v];if(k<0)break;out.push(k);}return out;}
+  const P2=k=>[NODES[k].x,NODES[k].y];
+  function fullRoute(u,v){
+    const A=NODES[u],B=NODES[v],ground=RD[u*NN+v];
+    if(Math.hypot(B.x-A.x,B.y-A.y)>FLY_MIN){
+      let best=null,bc=ground;
+      for(let i=0;i<APID.length;i++)for(let j=0;j<APID.length;j++){if(i===j||!airOK(i,j))continue;const pa=APID[i],pb=APID[j];
+        const L=Math.hypot(NODES[pb].x-NODES[pa].x,NODES[pb].y-NODES[pa].y);if(L<AIR_MIN)continue;
+        const c=RD[u*NN+pa]+RD[pb*NN+v]+L*AIR_K+AIR_WAIT;
+        if(c<bc){bc=c;best=[pa,pb];}}
+      if(best){
+        const pa=NODES[best[0]],pb=NODES[best[1]];
+        const g1=pathNodes(u,best[0]).map(P2),g2p=pathNodes(best[1],v).map(P2);
+        const dx=pb.x-pa.x,dy=pb.y-pa.y,cx=(pa.x+pb.x)/2-dy*0.18,cy=(pa.y+pb.y)/2+dx*0.18;
+        const arc=[];for(let k=1;k<=16;k++){const q=k/16;arc.push([(1-q)*(1-q)*pa.x+2*(1-q)*q*cx+q*q*pb.x,(1-q)*(1-q)*pa.y+2*(1-q)*q*cy+q*q*pb.y]);}
+        const pts=g1.concat(arc,g2p.slice(1));
+        const kinds=pts.map((_,i)=>i>=g1.length&&i<g1.length+arc.length?'a':'g');
+        return makeRoute(pts,kinds);
+      }
+    }
+    return makeRoute(pathNodes(u,v).map(P2));
+  }
+  function makeRoute(pts,kinds){
+    kinds=kinds||pts.map(()=>'g');
+    const cum=[0];
+    for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])*(kinds[i]==='a'?AIR_K:1));
+    let af=-1,at2=-1;
+    for(let i=1;i<pts.length;i++)if(kinds[i]==='a'){if(af<0)af=cum[i-1];at2=cum[i];}
+    return {pts:pts,kinds:kinds,cum:cum,len:cum[cum.length-1],fly:af>=0,airFrom:af,airTo:at2};
+  }
+  function townOf(x,y){if(inRoma(x,y))return 'Roma';let b='',bd=3;for(const t of TOWNS){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t.n;}}return b;}
+
+  const CANFLY=APID.some((a,i)=>APID.some((b,j)=>airOK(i,j)&&Math.hypot(NODES[a].x-NODES[b].x,NODES[a].y-NODES[b].y)>=AIR_MIN));
+  function homePos(i,N){
+    // circa il 56% abita dentro il Raccordo, il resto nei paesi attorno (Ostia compresa)
+    const nc=Math.max(1,Math.round(N*0.56));
+    let cx,cy,R,m,cnt;
+    if(i<nc){cx=ROMA.x;cy=ROMA.y;R=8;m=i;cnt=nc;}
+    else{const V=TOWNS.length,k=i-nc;const v=TOWNS[k%V];cx=v.x;cy=v.y;R=0.7;m=Math.floor(k/V);cnt=Math.max(1,Math.ceil((N-nc)/V));}
+    for(let tr=0;tr<40;tr++){
+      const r=R*Math.sqrt((m+0.5)/cnt)+tr*0.25,th=m*GA+tr*0.7;
+      const p=place(cx+r*Math.cos(th),cy+r*Math.sin(th));
+      if(p>=0)return p;
+    }
+    return TID[0];
+  }
+
+  function renderTerrain(){
+    const g=tc,S=W2P;
+    g.fillStyle=C.panel;g.fillRect(0,0,MW,MH);
+    g.fillStyle=C.water;g.beginPath();SEA.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.closePath();g.fill();
+    for(const c of CIRCLES){
+      if(c.t!=='monti')continue;
+      g.fillStyle=rgba(C.dim,0.08);g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();
+      g.strokeStyle=rgba(C.dim,0.35);g.lineWidth=1*DPR;
+      for(let k=1;k<=4;k++){g.beginPath();
+        for(let a=0;a<=64;a++){const th=a/64*2*Math.PI;const rr=c.r*k/4*(1+0.08*Math.sin(3*th+k));const x=S(c.x+rr*Math.cos(th)),y=S(c.y+rr*Math.sin(th));a?g.lineTo(x,y):g.moveTo(x,y);}
+        g.stroke();}
+    }
+    // Roma e i suoi isolati
+    g.fillStyle=rgba(C.dim,0.07);g.beginPath();g.arc(S(ROMA.x),S(ROMA.y),S(ROMA.r+0.6),0,7);g.fill();
+    g.fillStyle=rgba(C.dim,0.24);
+    const st=ROMA.step,hw=ROMA.street/2;
+    for(let i=0;i<GN-1;i++)for(let j=0;j<GN-1;j++){
+      if(gridId[nid(i,j)]<0||gridId[nid(i+1,j)]<0||gridId[nid(i,j+1)]<0||gridId[nid(i+1,j+1)]<0)continue;
+      const x0=nX(i)+hw,y0=nY(j)+hw,w=st-ROMA.street;
+      let w2=false;for(let u=0;u<=4&&!w2;u++)for(let v=0;v<=4&&!w2;v++)if(inRiver(x0+w*u/4,y0+w*v/4,0.1))w2=true;
+      if(!w2)g.fillRect(S(x0),S(y0),S(w),S(w));
+    }
+    for(const c of CIRCLES){if(c.t!=='lago')continue;g.fillStyle=C.water;g.beginPath();g.arc(S(c.x),S(c.y),S(c.r),0,7);g.fill();}
+    g.strokeStyle=C.water;g.lineWidth=Math.max(2,S(2*RIVER_W));g.lineCap='round';g.lineJoin='round';
+    for(const r of RIVERS){g.beginPath();r.pts.forEach((p,i)=>{if(i)g.lineTo(S(p[0]),S(p[1]));else g.moveTo(S(p[0]),S(p[1]));});g.stroke();}
+    for(const rd of ROADS){g.strokeStyle=rgba(C.ink,0.3);g.lineWidth=Math.max(1,S(0.2*rd.w));g.beginPath();rd.pts.forEach((q,i)=>{if(i)g.lineTo(S(q[0]),S(q[1]));else g.moveTo(S(q[0]),S(q[1]));});g.stroke();}
+    g.strokeStyle=rgba(C.ink,0.75);g.lineWidth=Math.max(2,S(0.3));g.lineCap='butt';
+    for(let u=0;u<NN;u++)for(const [v] of ADJ[u]){if(v<u)continue;const a=NODES[u],b=NODES[v];
+      if(wet(a.x,a.y,b.x,b.y)){g.beginPath();g.moveTo(S(a.x),S(a.y));g.lineTo(S(b.x),S(b.y));g.stroke();}}
+    TOWNS.forEach((v,vi)=>{
+      const r=rng(7+vi*31);g.fillStyle=rgba(C.dim,0.5);
+      for(let k=0;k<10;k++){const rr=0.9*Math.sqrt(r()),th=r()*2*Math.PI;const x=v.x+rr*Math.cos(th),y=v.y+rr*Math.sin(th);
+        if(blocked(x,y)||Math.abs(x-v.x)<0.2||Math.abs(y-v.y)<0.2)continue;const sz=0.2+r()*0.12;g.fillRect(S(x-sz/2),S(y-sz/2),S(sz),S(sz));}
+    });
+    for(const ap of AIRPORTS){if(ap.type==='heli'){g.strokeStyle=C.air;g.lineWidth=1.5*DPR;g.beginPath();g.arc(S(ap.x),S(ap.y),6*DPR,0,7);g.stroke();g.fillStyle=C.air;g.font='700 '+(8*DPR)+'px Space Grotesk, sans-serif';g.textAlign='center';g.fillText('H',S(ap.x),S(ap.y)+3*DPR);continue;}
+      g.save();g.translate(S(ap.x),S(ap.y));g.fillStyle=rgba(C.ink,0.55);g.rotate(-0.2);g.fillRect(-S(1.5),-S(0.2),S(3.0),S(0.4));g.rotate(1.1);g.fillRect(-S(1.0),-S(0.17),S(2.0),S(0.34));g.restore();}
+    g.textAlign='center';
+    g.fillStyle=rgba(C.ink,0.85);g.font='600 '+(13*DPR)+'px Space Grotesk, sans-serif';
+    g.fillText('Roma',S(ROMA.x),S(ROMA.y-ROMA.r)-8*DPR);
+    g.font=(10*DPR)+'px Space Grotesk, sans-serif';g.fillStyle=rgba(C.ink,0.7);
+    for(const t of TOWNS)g.fillText(t.n,S(t.x),S(t.y)+S(0.8)+10*DPR);
+    g.fillStyle=C.air;g.font='600 '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const ap of AIRPORTS)g.fillText(ap.n,S(ap.x),S(ap.y)-(ap.type==='heli'?10*DPR:S(1.2)+5*DPR));
+    g.fillStyle=rgba(C.dim,0.95);g.font='italic '+(10*DPR)+'px Space Grotesk, sans-serif';
+    for(const c of CIRCLES)if(c.n)g.fillText(c.n,S(c.x),S(c.y)+(c.t==='lago'?(c.r>2?4*DPR:-S(c.r)-5*DPR):4*DPR));
+    g.fillStyle=C.ret;
+    {const p=geo(42.06,12.575);g.fillText('Tevere',S(p[0])+22*DPR,S(p[1]));}
+    {const p=geo(41.955,12.70);g.fillText('Aniene',S(p[0]),S(p[1])-8*DPR);}
+    g.font='italic '+(12*DPR)+'px Space Grotesk, sans-serif';
+    {const p=geo(41.64,12.22);g.fillText('Mar Tirreno',S(p[0]),S(p[1]));}
+    g.textAlign='left';g.strokeStyle=rgba(C.ink,0.6);g.lineWidth=1.5*DPR;g.fillStyle=rgba(C.ink,0.65);g.font=(10*DPR)+'px Space Grotesk, sans-serif';
+    const sx=MW-S(12),sy=S(3);g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+S(10),sy);g.moveTo(sx,sy-4*DPR);g.lineTo(sx,sy+4*DPR);g.moveTo(sx+S(10),sy-4*DPR);g.lineTo(sx+S(10),sy+4*DPR);g.stroke();
+    g.fillText('10 km',sx,sy+14*DPR);
+  }
+
+  // quote reali indicative (m s.l.m.)
+  const ELEV_PTS=[[41.893,12.49,30],[41.90,12.47,20],[41.93,12.45,139],[41.89,12.50,50],[41.83,12.47,40],[41.87,12.62,60],[41.95,12.55,40],[41.86,12.40,40],[41.99,12.45,60],[41.80,12.52,60],[41.93,12.38,100],
+    [41.733,12.29,2],[41.772,12.24,2],[41.85,12.205,2],[41.954,12.085,4],[41.99,12.10,81],[41.67,12.50,108],[41.625,12.465,5],[41.80,12.60,129],[41.807,12.681,322],[41.77,12.66,355],
+    [41.747,12.65,426],[41.729,12.659,384],[41.687,12.777,332],[41.963,12.798,225],[42.0,12.73,105],[42.052,12.616,165],[42.0,12.62,140],[42.09,12.27,195],[42.10,12.175,280],[42.0,12.38,160],
+    [41.8003,12.2389,3],[41.7994,12.5949,129],[41.76,12.35,10],[41.84,12.75,250],[42.08,12.48,100],[41.70,12.70,500],[42.03,12.55,30],[41.93,12.25,60]];
+  // quota sul livello del mare: interpolazione tra punti di quota reale (m s.l.m.), media pesata 1/d² sui 4 più vicini
+  const ELEV=ELEV_PTS.map(p=>{const q=geo(p[0],p[1]);return [q[0],q[1],p[2]];}),ECACHE=new Map();
+  function elevAt(x,y){
+    const key=Math.round(x*20)*100000+Math.round(y*20);let z=ECACHE.get(key);if(z!==undefined)return z;
+    const near=ELEV.map(e=>[(e[0]-x)*(e[0]-x)+(e[1]-y)*(e[1]-y),e[2]]).sort((a,b)=>a[0]-b[0]).slice(0,4);
+    if(near[0][0]<1e-6)z=near[0][1];else{let sw=0,sz=0;for(const [d2,h] of near){const w=1/d2;sw+=w;sz+=w*h;}z=sz/sw;}
+    ECACHE.set(key,z);return z;
+  }
+  return {NODES,ADJ,place,fullRoute,makeRoute,townOf,homePos,renderTerrain,CANFLY,elevAt};
 }
 
 const MAPDEFS={
-  ny:{tripRef:10.9,pop:12.0e6,popParts:[['Manhattan',1.69e6],['Brooklyn e Queens (con Nassau ovest)',5.75e6],['Bronx e Yonkers',1.68e6],['New Jersey (Newark, Jersey City, Hoboken, Elizabeth)',2.4e6],['Staten Island',0.5e6]],world:55,car:22,l100:10,airL:0.16,airName:'elicottero',airKmh:180,build:buildNewYork,title:"Mobilit\u00e0 umana a New York: esplorazione e ritorno",desc:"New York con distanze reali: Manhattan con la griglia inclinata delle sue avenue e Central Park, Brooklyn e il Queens, il Bronx, Staten Island e il New Jersey da Newark a Hoboken. L'acqua divide tutto: l'Hudson, l'East River, la baia e l'oceano si attraversano solo su ponti e tunnel, o con il traghetto di Staten Island. Dagli eliporti di Manhattan partono le navette in elicottero verso JFK, LaGuardia e Newark: chi vola diventa un aereo viola sulla rotta tratteggiata. Ogni persona vive in uno dei cinque territori, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato."},
-  london:{tripRef:13.3,pop:11.3e6,popParts:[['Greater London',8.8e6],['Cittadine attorno (Watford, Slough, Guildford…)',2.5e6]],world:100,car:27,l100:8,airL:0.04,airName:'aereo',airKmh:500,build:buildLondra,title:"Mobilit\u00e0 umana a Londra: esplorazione e ritorno",desc:"Londra e dintorni, con distanze reali: la citt\u00e0 con il Tamigi e i suoi ponti, l'anello della M25, le autostrade radiali, diciotto cittadine attorno e cinque aeroporti. Ogni persona vive a Londra o in una delle cittadine, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade, e per i viaggi lunghi si pu\u00f2 prendere l'aereo: chi vola diventa un aereo viola che segue la rotta tratteggiata fino all'aeroporto di arrivo."},
-  fvg:{tripRef:12.7,pop:1.19e6,popParts:[['Trieste',199e3],['Udine',97e3],['Pordenone',51e3],['Gorizia',33e3],['Resto della regione',810e3]],world:125,car:45,l100:6.5,airL:0.06,airName:'aereo leggero',airKmh:200,build:buildFriuli,title:"Mobilit\u00e0 umana in Friuli Venezia Giulia: esplorazione e ritorno",desc:"Tutto il Friuli Venezia Giulia con distanze reali: Trieste, Udine, Pordenone e Gorizia con le loro reti di strade, quaranta paesi dalla Carnia alla costa, autostrade e statali principali, il Tagliamento, il Fella e l'Isonzo con i loro ponti, il mare Adriatico, i monti e i laghi. Ogni persona vive in una citt\u00e0 o in un paese, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade."}
+  ny:{ctPop:19.4e6,modes:{walk:0.88,pt:0.31},ct:{type:'city',name:'New York',country:'USA'},tripRef:10.9,pop:12.0e6,popParts:[['Manhattan',1.69e6],['Brooklyn e Queens (con Nassau ovest)',5.75e6],['Bronx e Yonkers',1.68e6],['New Jersey (Newark, Jersey City, Hoboken, Elizabeth)',2.4e6],['Staten Island',0.5e6]],world:55,car:22,l100:10,airL:0.16,airName:'elicottero',airKmh:180,build:buildNewYork,title:"Mobilit\u00e0 umana a New York: esplorazione e ritorno",desc:"New York con distanze reali: Manhattan con la griglia inclinata delle sue avenue e Central Park, Brooklyn e il Queens, il Bronx, Staten Island e il New Jersey da Newark a Hoboken. L'acqua divide tutto: l'Hudson, l'East River, la baia e l'oceano si attraversano solo su ponti e tunnel, o con il traghetto di Staten Island. Dagli eliporti di Manhattan partono le navette in elicottero verso JFK, LaGuardia e Newark: chi vola diventa un aereo viola sulla rotta tratteggiata. Ogni persona vive in uno dei cinque territori, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato."},
+  london:{ctPop:9.8e6,leftHand:true,modes:{walk:1.14,pt:0.31},ct:{type:'city',name:'London',country:'GBR'},tripRef:13.3,pop:11.3e6,popParts:[['Greater London',8.8e6],['Cittadine attorno (Watford, Slough, Guildford…)',2.5e6]],world:100,car:27,l100:8,airL:0.04,airName:'aereo',airKmh:500,build:buildLondra,title:"Mobilit\u00e0 umana a Londra: esplorazione e ritorno",desc:"Londra e dintorni, con distanze reali: la citt\u00e0 con il Tamigi e i suoi ponti, l'anello della M25, le autostrade radiali, diciotto cittadine attorno e cinque aeroporti. Ogni persona vive a Londra o in una delle cittadine, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade, e per i viaggi lunghi si pu\u00f2 prendere l'aereo: chi vola diventa un aereo viola che segue la rotta tratteggiata fino all'aeroporto di arrivo."},
+  fvg:{ctPop:1.19e6,modes:{walk:0.34,pt:0.10},ct:{type:'admin',name:'Friuli-Venezia Giulia',level:1},tripRef:12.7,pop:1.19e6,popParts:[['Trieste',199e3],['Udine',97e3],['Pordenone',51e3],['Gorizia',33e3],['Resto della regione',810e3]],world:125,car:45,l100:6.5,airL:0.06,airName:'aereo leggero',airKmh:200,build:buildFriuli,title:"Mobilit\u00e0 umana in Friuli Venezia Giulia: esplorazione e ritorno",desc:"Tutto il Friuli Venezia Giulia con distanze reali: Trieste, Udine, Pordenone e Gorizia con le loro reti di strade, quaranta paesi dalla Carnia alla costa, autostrade e statali principali, il Tagliamento, il Fella e l'Isonzo con i loro ponti, il mare Adriatico, i monti e i laghi. Ogni persona vive in una citt\u00e0 o in un paese, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade."},
+  roma:{ctPop:3.7e6,modes:{walk:0.42,pt:0.28},ct:{type:'city',name:'Rome',country:'ITA'},tripRef:14.0,pop:3.6e6,popParts:[['Roma dentro il Raccordo',2.0e6],['Roma fuori dal Raccordo (con Ostia)',0.75e6],['Comuni attorno (Fiumicino, Pomezia, Castelli, Tivoli…)',0.85e6]],world:70,car:24,l100:7.5,airL:0.16,airName:'elicottero',airKmh:180,build:buildRoma,title:"Mobilit\u00e0 umana a Roma: esplorazione e ritorno",desc:"Roma e dintorni con distanze reali: la citt\u00e0 dentro il Grande Raccordo Anulare, il Tevere e l'Aniene con i loro ponti, le consolari e le autostrade verso Fiumicino, Ostia, Pomezia, i Castelli Romani, Tivoli, Monterotondo e Bracciano, il mar Tirreno, il lago di Bracciano e i Colli Albani, e gli aeroporti di Fiumicino e Ciampino, collegati in elicottero all'aeroporto dell'Urbe. Ogni persona vive a Roma o in un comune vicino, con le case disposte sulla spirale aurea, e a ogni passo decide se esplorare un luogo nuovo o tornare in uno gi\u00e0 visitato. Ci si muove solo lungo le strade."}
 };
 let MAP=null,NODES=[],CANFLY=false;const MAPS={};
 const elevAt=(x,y)=>MAP.elevAt(x,y),place=(x,y)=>MAP.place(x,y),fullRoute=(u,v)=>MAP.fullRoute(u,v),makeRoute=(p,k)=>MAP.makeRoute(p,k);
@@ -1103,7 +1372,8 @@ let kmSum=0,kmN=0,days=0,curMap='ny';
 /* ---------- carburante ----------
    auto: km di strada × consumo (l/100 km), più alto dove il traffico è lento
    volo: km in aria × litri per passeggero al km (elicottero a New York, aereo altrove) */
-let fuel=0,fuelAir=0,fuelFrame=0,fuelRate=0,airH=0,fuelElev=0,climbM=0;
+let fuel=0,fuelAir=0,fuelFrame=0,fuelRate=0,airH=0,fuelElev=0,climbM=0,fuelCong=0,fuelPT=0,trafT=0,trafD=0,carRawL=0;
+let CALF=1;   // fattore di taratura della parte in auto (1 = nessuna taratura)
 /* dislivello: per salire di h metri un'auto di massa m deve guadagnare l'energia potenziale m·g·h;
    il motore la ottiene bruciando carburante con rendimento η, e un litro contiene l'energia E.
    litri per metro di salita: K_UP = m·g / (η·E) = 1400 kg · 9,81 m/s² / (0,25 · 32 MJ/l) ≈ 0,0017 l/m.
@@ -1113,7 +1383,7 @@ function tripKm(){return kmN?kmSum/kmN:8;}
 // la scala del tempo usa un viaggio medio di riferimento fisso per ogni mappa (media misurata su un ciclo
 // completo di 4000 passi dopo il riscaldamento), così i passi al giorno restano costanti; il viaggio medio misurato serve solo come confronto
 function tripMin(){const d=MAPDEFS[curMap];return d.tripRef/d.car*60;}
-function stepsPerDay(){return Math.max(0.5,Math.min(12,DRIVE_MIN/tripMin()));}
+function stepsPerDay(){return Math.max(3,Math.min(12,DRIVE_MIN/tripMin()));}   // almeno 3: lavoro o scuola, un'altra sosta, ritorno a casa
 let histE,histA,Sser;
 let acc=0,lastTs=0,tau=0,pend=0;   // tau: tempo continuo misurato in passi
 const C={};
@@ -1144,7 +1414,7 @@ function binOf(d){
 // case: 60% in città, il resto nei villaggi, ognuno con la sua spirale aurea
 function reset(keep){
   if(!keep)cycle=1;
-  agents=[];t=0;acc=0;tau=0;densReset();flights=0;topZone=null;topPP=null;contacts=0;sparks=[];touching=new Set();kmSum=0;kmN=0;days=0;fuel=0;fuelAir=0;fuelFrame=0;airH=0;fuelRate=0;fuelElev=0;climbM=0;
+  agents=[];t=0;acc=0;tau=0;densReset();flights=0;topZone=null;topPP=null;contacts=0;sparks=[];touching=new Set();kmSum=0;kmN=0;days=0;fuel=0;fuelAir=0;fuelFrame=0;airH=0;fuelRate=0;fuelElev=0;climbM=0;fuelCong=0;fuelPT=0;trafT=0;trafD=0;carRawL=0;
   histE=new Float64Array(NB);histA=new Float64Array(NB);Sser=[];
   for(let i=0;i<P.N;i++){
     const h=homePos(i,P.N);
@@ -1156,6 +1426,84 @@ function reset(keep){
   running=true;$('play').textContent='Pausa';
 }
 
+
+/* ---------- mezzo di trasporto ----------
+   per ogni viaggio: a piedi o in bici è probabile solo sulle distanze brevi, i mezzi pubblici sulle medie,
+   l'auto copre il resto. probabilità di partenza diverse per mappa, calibrate sulle quote modali reali
+   obiettivi: New York e Londra circa 45% auto, 30% mezzi, 25% piedi o bici; Roma 60/25/15; Friuli Venezia Giulia 78/8/14
+   (ordini di grandezza delle indagini sulla mobilità; l'area delle mappe comprende anche zone suburbane, dove l'auto pesa di più). */
+const PT_L=0.02;   // mezzi pubblici: litri (equivalenti) per passeggero al km, tra autobus e metropolitana
+const modeN={car:0,pt:0,walk:0};
+function chooseMode(d){
+  const m=MAPDEFS[curMap].modes;
+  const pw=Math.min(0.95,m.walk*Math.exp(-d/3)),pp=Math.min(1-pw,m.pt*Math.min(1,d/1.5)*(d>40?0.4:1));
+  const u=Math.random();
+  return u<pw?'walk':u<pw+pp?'pt':'car';
+}
+
+/* ---------- traffico ----------
+   ogni quadrato ha una capacità proporzionale alla superficie servita dalle strade (tutta, se è attraversato da una rete fitta);
+   il carico è la media mobile dei km percorsi in auto nel quadrato (riportati alla popolazione reale, 1,3 persone per auto, 16 ore di traffico).
+   rapporto carico/capacità → tempo di percorrenza con la funzione BPR: t = t0 · (1 + 0,15 · (v/c)⁴);
+   la marcia a singhiozzo fa crescere anche il consumo: +40% dell'aumento di tempo, al massimo il doppio.
+   i percorsi restano quelli più brevi: le persone non cambiano strada per evitare il traffico. */
+const CAP_KM=7000,OCC=1.3,TRAF_H=16;   // capacità: veicoli·km all'ora per km² di territorio servito
+let ROADKM=new Float64Array(625),TRAFACC=new Float64Array(625),TRAF=new Float64Array(625),trafDays=0;   // 25 × 25 quadrati, come la griglia della densità
+function roadCapacity(){
+  ROADKM=new Float64Array(DG*DG);const N=MAP.NODES,A=MAP.ADJ;
+  for(let u=0;u<N.length;u++)for(const [v] of A[u]){if(v<u)continue;const a=N[u],b=N[v];
+    if(a.x<0||a.y<0||a.x>WORLD||a.y>WORLD)continue;ROADKM[cellOf((a.x+b.x)/2,(a.y+b.y)/2)]+=Math.hypot(a.x-b.x,a.y-b.y);}
+}
+function trafReset(){TRAFACC=new Float64Array(DG*DG);TRAF=new Float64Array(DG*DG);VC=new Float64Array(DG*DG);trafDays=0;}
+let VC=new Float64Array(625);
+const vcOf=c=>VC[c];
+function vcUpdate(){
+  VC=new Float64Array(DG*DG);
+  for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){let L=0,R=0;
+    const c=cellKm(),area=c*c;
+    for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const ii=i+di,jj=j+dj;if(ii<0||jj<0||ii>=DG||jj>=DG)continue;
+      // capacità per km² di territorio servito dalle strade: uguale in tutte le mappe, indipendente da quanto è fitta la griglia disegnata
+      L+=TRAF[jj*DG+ii];R+=area*Math.min(1,ROADKM[jj*DG+ii]/(2*c));}
+    VC[j*DG+i]=ROADKM[j*DG+i]>0&&R>0?L/(R*CAP_KM):0;}
+}
+const bpr=vc=>1+0.15*Math.pow(Math.min(vc,2),4);   // oltre il doppio della capacità il tempo non cresce più (al massimo ×3,4)
+const congFuel=c=>Math.min(2,1+0.4*(bpr(vcOf(c))-1));
+// una volta al giorno simulato: il carico del giorno entra nella media mobile
+function trafDaily(){
+  const k=popScale();
+  for(let c=0;c<TRAF.length;c++){const load=TRAFACC[c]*k/OCC/TRAF_H;TRAF[c]=trafDays?TRAF[c]*0.8+load*0.2:load;}
+  TRAFACC=new Float64Array(DG*DG);trafDays++;vcUpdate();
+}
+
+/* ---------- lavoro e studio ----------
+   circa il 60% delle persone ha un luogo fisso (lavoro o scuola), scelto con un salto dalla casa secondo la formula dei salti.
+   il primo spostamento della giornata porta lì e la sosta dura 8 ore. */
+const WORK_P=0.6,WORK_H=8;
+function assignWork(a,center){
+  if(Math.random()>WORK_P)return;
+  const h=a.locs[0];let p=-1;
+  for(let tr=0;tr<40&&p<0;tr++){
+    const dr=sampleJump(),th=Math.random()*2*Math.PI;
+    p=place(h.x+dr*Math.cos(th),h.y+dr*Math.sin(th));if(p===h.node)p=-1;
+  }
+  if(p<0)return;
+  a.locs.push({x:NODES[p].x,y:NODES[p].y,node:p,n:1});a.known.add(p);a.total++;a.work=1;
+}
+
+/* ---------- memoria limitata: niente più riavvio ----------
+   quando una persona conosce più di LMAX luoghi, dimentica quelli visitati meno (mai casa, lavoro o il luogo attuale),
+   così la simulazione può andare avanti senza fine con memoria costante. */
+const LMAX=120,LKEEP=100;
+function forget(a){
+  if(a.locs.length<=LMAX)return;
+  const keep=new Set([0,a.cur]);if(a.work)keep.add(1);
+  const order=a.locs.map((l,i)=>i).filter(i=>!keep.has(i)).sort((i,j)=>a.locs[j].n-a.locs[i].n);
+  for(const i of order.slice(0,LKEEP-keep.size))keep.add(i);
+  const idx=[...keep].sort((i,j)=>i-j),map=new Map(idx.map((o,n)=>[o,n]));
+  a.locs=idx.map(i=>a.locs[i]);a.cur=map.get(a.cur);
+  a.known=new Set(a.locs.map(l=>l.node));a.total=a.locs.reduce((s,l)=>s+l.n,0);
+}
+
 /* ---------- ritmo giornaliero ----------
    ogni giornata ha K spostamenti (K = passi al giorno); l'ultimo riporta a casa per la notte.
    le 14 ore di giorno si dividono tra le K soste; la sosta serale a casa aggiunge le 10 ore di notte. */
@@ -1164,11 +1512,12 @@ function stepAgent(a){
   const S=a.locs.length;
   const pNew=Math.min(1,P.rho*Math.pow(S,-P.gamma));
   const from=a.locs[a.cur];
-  const K=Math.max(2,Math.round(stepsPerDay()));
+  const K=Math.max(3,Math.round(stepsPerDay()));
   a.k=(a.k||0)+1;
-  const night=a.k%K===0;
+  const night=a.k%K===0,toWork=!night&&a.work&&a.k%K===1&&a.cur!==1;
   let idx=a.cur,explored=false;
   if(night){idx=0;explored=true;a.last='r';}   // rientro serale
+  else if(toWork){idx=1;explored=true;a.last='r';}   // al lavoro o a scuola
   else if(Math.random()<pNew){
     let p=-1,dr=0;
     for(let tr=0;tr<40&&p<0;tr++){dr=sampleJump();const ang=Math.random()*2*Math.PI;p=place(from.x+dr*Math.cos(ang),from.y+dr*Math.sin(ang));if(a.known.has(p))p=-1;}
@@ -1195,28 +1544,45 @@ function stepAgent(a){
   const d=Math.hypot(to.x-from.x,to.y-from.y);
   if(d>0){const b=binOf(d);if(b>=0)histA[b]++;}
   to.n++;a.total++;a.cur=idx;a.moves++;
-  const dur=(24-NIGHT_H)/K+(night?NIGHT_H:0);
+  // ore della sosta: lavoro 8 ore, le altre ore del giorno divise tra le soste non di lavoro, la notte a casa 10 ore in più
+  const nonWork=K-(a.work?1:0),freeH=(24-NIGHT_H)-(a.work?WORK_H:0);
+  const dur=(idx===1&&a.work&&toWork)?WORK_H:freeH/Math.max(1,nonWork)+(night?NIGHT_H:0);
   a.hAll=(a.hAll||0)+dur;if(idx===0)a.hHome=(a.hHome||0)+dur;
   a.route=to.node!==from.node?fullRoute(from.node,to.node):makeRoute([[to.x,to.y]]);
+  a.mode=a.route.len>0?chooseMode(d):a.mode||'car';
   if(a.route.len>0){
-    const md=MAPDEFS[curMap];
-    let g=0,air=0,adj=0,up=0;const r=a.route;
+    const md=MAPDEFS[curMap],car=a.mode==='car',walk=a.mode==='walk';
+    modeN[a.mode]++;
+    let g=0,air=0,adj=0,up=0,ptL=0,carKm=0,cong=0;const r=a.route;
     for(let i=1;i<r.pts.length;i++){
       const p0=r.pts[i-1],p1=r.pts[i],d=Math.hypot(p1[0]-p0[0],p1[1]-p0[1]);
       if(r.kinds[i]==='a'){air+=d;continue;}
       g+=d;
+      const cc=cellOf((p0[0]+p1[0])/2,(p0[1]+p1[1])/2);
+      if(walk)continue;
+      if(!car){ptL+=d*PT_L;HEAT[cc]+=d*PT_L*KWH_CAR;continue;}   // mezzi pubblici: consumo per passeggero, niente traffico in più
+      TRAFACC[cc]+=d;
       // dislivello del tratto: in salita si paga l'energia potenziale, in discesa se ne recupera una parte
       const dh=elevAt(p1[0],p1[1])-elevAt(p0[0],p0[1]);
-      if(dh>0){adj+=dh*K_UP;up+=dh;}else if(dh<0)adj-=Math.min(d*md.l100/100*DOWN_MAX,-dh*K_UP*DOWN_REC);
+      let segAdj=0;
+      if(dh>0){segAdj=dh*K_UP;up+=dh;}else if(dh<0)segAdj=-Math.min(d*md.l100/100*DOWN_MAX,-dh*K_UP*DOWN_REC);
+      // traffico: la marcia a singhiozzo aumenta il consumo del tratto
+      const segBase=d*md.l100/100*congFuel(cc);
+      adj+=segAdj;cong+=segBase-d*md.l100/100;carKm+=d;trafT+=d*bpr(vcOf(cc));trafD+=d;
+      HEAT[cc]+=(segBase+segAdj)*KWH_CAR*CALF;   // kWh di calore in quel quadrato
     }
     kmSum+=g;kmN++;
-    const lc=g*md.l100/100+adj,la=air*md.airL;
+    const lcCar=car?carKm*md.l100/100+adj+cong:0;carRawL+=lcCar;
+    const lc=lcCar*CALF+ptL,la=air*md.airL;
+    if(!car){adj=0;cong=0;}else{adj*=CALF;cong*=CALF;}
+    fuelCong+=cong;fuelPT+=ptL;
     fuelElev+=adj;climbM+=up;a.climb=(a.climb||0)+up;
     fuel+=lc+la;fuelAir+=la;fuelFrame+=lc+la;a.fuel+=lc+la;a.fuelAir=(a.fuelAir||0)+la;
     if(air>0){const h=air/md.airKmh;airH+=h;a.airH=(a.airH||0)+h;}
   }
   if(a.route.fly){a.flights++;flights++;}
   a.hist.push(a.route);if(a.hist.length>12)a.hist.shift();
+  forget(a);
 }
 
 // il tempo scorre in modo continuo: ogni persona fa il suo passo quando arriva il suo turno,
@@ -1226,16 +1592,20 @@ function advance(ds){
   for(const a of agents){let g=0;while(a.next<=target&&g++<80){stepAgent(a);a.t0=a.next;a.next+=1;}}
   tau=target;
   while(t+1<=tau){
-    t++;days+=1/stepsPerDay();
+    const d0=Math.floor(days);t++;days+=1/stepsPerDay();
+    if(Math.floor(days)>d0)trafDaily();
     if(t%5===0||t<20){let s=0;for(const a of agents)s+=a.locs.length;Sser.push([t,s/agents.length]);}
+    if(Sser.length>1500)Sser=Sser.filter((p,i)=>i%2===0||i===Sser.length-1);
   }
-  if(t>=WARMUP+T_MAX){cycle++;reset(true);}
 }
 // riscaldamento: la simulazione gira di nascosto, così le persone partono con una rete di luoghi già consolidata;
 // poi si azzerano tempo, carburante, CO₂, voli, contatti e densità, e si comincia a contare
 function warmup(){
+  const ctr=agents[0]?agents[0].locs[0]:{x:WORLD/2,y:WORLD/2};
+  for(const a of agents)assignWork(a,ctr);
+  trafReset();
   for(let s=0;s<WARMUP;s++)advance(1);
-  days=0;kmSum=0;kmN=0;fuel=0;fuelAir=0;fuelFrame=0;fuelRate=0;airH=0;fuelElev=0;climbM=0;flights=0;contacts=0;sparks=[];touching=new Set();densReset();topZone=null;topPP=null;
+  days=0;kmSum=0;kmN=0;fuel=0;fuelAir=0;fuelFrame=0;fuelRate=0;airH=0;fuelElev=0;climbM=0;fuelCong=0;fuelPT=0;trafT=0;trafD=0;carRawL=0;flights=0;contacts=0;sparks=[];touching=new Set();densReset();topZone=null;topPP=null;modeN.car=modeN.pt=modeN.walk=0;
   for(const a of agents){a.fuel=0;a.fuelAir=0;a.airH=0;a.climb=0;a.flights=0;a.hHome=0;a.hAll=0;a.t0=tau-1;a.flash=0;}
 }
 // il movimento lungo le strade e la scia sono sempre animati, perché mostrano dove vanno le persone;
@@ -1291,23 +1661,41 @@ function plane(r,e,x,y,size){
 function poly(pts){mctx.beginPath();pts.forEach((p,i)=>{const x=W2P(p[0]),y=W2P(p[1]);if(i)mctx.lineTo(x,y);else mctx.moveTo(x,y);});}
 const ease=p=>0.5-0.5*Math.cos(Math.PI*p);
 // scia con inerzia: la coda parte in ritardo e raggiunge la testa all'arrivo
-function streak(r,p0,col,w){
+function streak(r,p0,col,w,mode,lane){
   if(p0>=1||r.len<=0)return;
   const h=ease(p0),q=ease(Math.max(0,(p0-0.3)/0.7));if(h-q<1e-4)return;
-  const pts=sub(r,q,h),T=pts[0],H=pts[pts.length-1];
+  let pts=sub(r,q,h);if(lane)pts=laneOffset(pts);const T=pts[0],H=pts[pts.length-1];
   if(Math.hypot(W2P(H[0]-T[0]),W2P(H[1]-T[1]))<1)return;
   const g=mctx.createLinearGradient(W2P(T[0]),W2P(T[1]),W2P(H[0]),W2P(H[1]));
   g.addColorStop(0,rgba(col,0));g.addColorStop(1,rgba(col,0.9));
-  mctx.strokeStyle=g;mctx.lineWidth=w*DPR;mctx.lineCap='round';mctx.lineJoin='round';
-  poly(pts);mctx.stroke();
+  mctx.strokeStyle=g;mctx.lineWidth=(mode==='walk'?w*0.7:w)*DPR;mctx.lineCap='round';mctx.lineJoin='round';
+  mctx.setLineDash(mode==='pt'?[5*DPR,3*DPR]:mode==='walk'?[1*DPR,3*DPR]:[]);
+  poly(pts);mctx.stroke();mctx.setLineDash([]);
 }
 
+/* ---------- doppio senso di marcia ----------
+   chi si muove viaggia spostato di LANE pixel sul lato della sua corsia: a destra della direzione di marcia,
+   a sinistra a Londra (guida a sinistra). chi viaggia in senso opposto sta sull'altra corsia e non si scontra. */
+const LANE=4.5;
+const laneSide=()=>MAPDEFS[curMap].leftHand?-1:1;
+// sposta una spezzata (coordinate del mondo) sulla corsia, usando la direzione locale di ogni punto
+function laneOffset(pts){
+  const o=laneSide()*LANE*DPR/MW*WORLD,n=pts.length,out=[];
+  for(let i=0;i<n;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(n-1,i+1)];let dx=b[0]-a[0],dy=b[1]-a[1];const L=Math.hypot(dx,dy)||1;dx/=L;dy/=L;out.push([pts[i][0]-dy*o,pts[i][1]+dx*o]);}
+  return out;
+}
 // collisioni tra persone: chi si sovrappone viene spinto via, poi una molla lo riporta sulla strada
 function placeAgents(){
   const sa=agents[sel],n=agents.length;
   for(const b of agents){
     b.p0=progress(b);b.e=ease(b.p0);const e=b.e;
-    const p=at(b.route,e);b.tx=W2P(p[0]);b.ty=W2P(p[1]);b.fl=isFlying(b.route,e);b.rad=(b===sa?8:3.2)*DPR;
+    const p=at(b.route,e);let tx=W2P(p[0]),ty=W2P(p[1]);b.fl=isFlying(b.route,e);b.rad=(b===sa?8:3.2)*DPR;b.hx=0;b.hy=0;
+    // direzione di marcia e corsia
+    if(!b.fl&&b.p0<1&&b.route.len>0){
+      const q1=at(b.route,Math.min(1,e+0.004)),q0=at(b.route,Math.max(0,e-0.004));let dx=q1[0]-q0[0],dy=q1[1]-q0[1];const L=Math.hypot(dx,dy);
+      if(L>1e-6){dx/=L;dy/=L;b.hx=dx;b.hy=dy;const o=laneSide()*LANE*DPR;tx-=dy*o;ty+=dx*o;}
+    }
+    b.tx=tx;b.ty=ty;
     if(b.ox===undefined){b.ox=0;b.oy=0;}
     b.ox*=0.85;b.oy*=0.85;if(b.fl){b.ox=0;b.oy=0;}
   }
@@ -1316,6 +1704,7 @@ function placeAgents(){
     const A=agents[i];if(A.fl)continue;
     for(let j=i+1;j<n;j++){
       const B=agents[j];if(B.fl)continue;
+      if(A.hx*B.hx+A.hy*B.hy<-0.3)continue;   // sensi opposti: corsie diverse
       let dx=(B.tx+B.ox)-(A.tx+A.ox),dy=(B.ty+B.oy)-(A.ty+A.oy);const md=A.rad+B.rad+DPR;
       if(Math.abs(dx)>md||Math.abs(dy)>md)continue;
       let d=Math.hypot(dx,dy);if(d>=md)continue;
@@ -1334,6 +1723,29 @@ function placeAgents(){
 function drawMap(ts){
   mctx.drawImage(terr,0,0);
   placeAgents();
+  // mappa del traffico: carico rispetto alla capacità delle strade (sotto le persone)
+  if(SHOW.traf){
+    const c=cellKm(),w=W2P(c);let top=-1,tv=0;
+    for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){const v=VC[j*DG+i];if(v<0.3)continue;if(v>tv){tv=v;top=j*DG+i;}
+      mctx.fillStyle=rgba(v>=1?C.hot:C.amber,Math.min(0.5,0.12+0.3*v));mctx.fillRect(i*w,j*w,w,w);}
+    if(top>=0){const i=top%DG,j=Math.floor(top/DG),x=i*w,y=j*w;
+      mctx.strokeStyle=C.hot;mctx.lineWidth=2*DPR;mctx.setLineDash([3*DPR,3*DPR]);mctx.strokeRect(x,y,w,w);mctx.setLineDash([]);
+      mctx.fillStyle=C.hot;mctx.font='600 '+(11*DPR)+'px Space Grotesk, sans-serif';mctx.textAlign='center';
+      const lab='traffico massimo: '+(townOf((i+0.5)*c,(j+0.5)*c)||'campagna')+', carico '+Math.round(tv*100)+'% della capacità, +'+Math.round((bpr(tv)-1)*100)+'% di tempo',tw=mctx.measureText(lab).width;
+      mctx.fillText(lab,Math.min(MW-tw/2-4*DPR,Math.max(tw/2+4*DPR,x+w/2)),y+w+14*DPR>MH-4*DPR?y-6*DPR:y+w+14*DPR);mctx.textAlign='left';}
+  }
+  // mappa del calore (sotto le persone)
+  if(SHOW.heat&&heatTop){
+    const c=cellKm(),w=W2P(c),mx=heatTop.q;
+    for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){const q=heatFlux(j*DG+i);if(q<=0)continue;
+      mctx.fillStyle=rgba(C.hot,0.45*Math.pow(q/mx,0.5));mctx.fillRect(i*w,j*w,w,w);}
+    const x=heatTop.i*w,y=heatTop.j*w;
+    mctx.strokeStyle=C.hot;mctx.lineWidth=2*DPR;mctx.strokeRect(x,y,w,w);
+    mctx.fillStyle=C.hot;mctx.font='600 '+(11*DPR)+'px Space Grotesk, sans-serif';mctx.textAlign='center';
+    const lab='calore massimo: '+heatTop.name+', '+heatTop.q.toLocaleString('it-IT',{maximumFractionDigits:2})+' W/m²',tw=mctx.measureText(lab).width;
+    mctx.fillText(lab,Math.min(MW-tw/2-4*DPR,Math.max(tw/2+4*DPR,x+w/2)),y-6*DPR<14*DPR?y+w+14*DPR:y-6*DPR);
+    mctx.textAlign='left';
+  }
   // mappa di densità (sotto le persone)
   if(SHOW.dens&&topDens){
     const c=cellKm(),w=W2P(c),mx=topDens.v;
@@ -1357,7 +1769,7 @@ function drawMap(ts){
     const P0=b.p0,e=b.e,fl=b.fl;
     const col=fl?C.air:(b.last==='e'?C.amber:C.ret),x=b.x,y=b.y;
     if(b.route.fly&&P0<1)flightPath(b.route,0.35);
-    streak(b.route,P0,col,fl?2.2:1.6);
+    streak(b.route,P0,col,fl?2.2:1.6,fl?'car':b.mode,!fl);
     if(b.flash>0&&!REDUCED){
       mctx.strokeStyle=rgba(C.amber,b.flash);mctx.lineWidth=1.5*DPR;
       mctx.beginPath();mctx.arc(x,y,(3+(1-b.flash)*14)*DPR,0,7);mctx.stroke();
@@ -1372,7 +1784,7 @@ function drawMap(ts){
     mctx.strokeStyle=rgba(C.gold,0.8);mctx.lineWidth=1.8*DPR;mctx.lineJoin='round';mctx.lineCap='round';
     for(let i=0;i<a.hist.length-1;i++)drawRoute(a.hist[i],1);
     drawRoute(a.route,e);
-    streak(a.route,P0,col,3);
+    streak(a.route,P0,col,3,fl?'car':a.mode,!fl);
     const h=a.locs[0];mctx.strokeStyle=C.ink;mctx.lineWidth=1.5*DPR;
     mctx.strokeRect(W2P(h.x)-6*DPR,W2P(h.y)-6*DPR,12*DPR,12*DPR);
     const ix=a.x,iy=a.y;
@@ -1419,7 +1831,7 @@ function drawMap(ts){
   mctx.lineWidth=1.2*DPR;
   for(const sp of sparks){mctx.strokeStyle=rgba(C.ink,sp.l*0.8);mctx.beginPath();mctx.arc(sp.x,sp.y,(2+(1-sp.l)*9)*DPR,0,7);mctx.stroke();sp.l-=0.06;}
   sparks=sparks.filter(sp=>sp.l>0);
-  $('hud').textContent='giorno '+(Math.floor(days)+1)+' (anno '+(Math.floor(days/365)+1)+')   passo '+Math.max(0,t-WARMUP)+' / '+T_MAX+'   ciclo '+cycle+(CANFLY?'   voli '+flights+' ('+fmtH(airH)+' in volo)':'')+'   contatti '+contacts;
+  $('hud').textContent='giorno '+(Math.floor(days)+1)+' (anno '+(Math.floor(days/365)+1)+')   passo '+Math.max(0,t-WARMUP)+(CANFLY?'   voli '+flights+' ('+fmtH(airH)+' in volo)':'')+'   contatti '+contacts;
 }
 
 map.addEventListener('click',ev=>{
@@ -1443,6 +1855,8 @@ function updateWho(){
   $('who').innerHTML=
     '<span>Luoghi visitati</span><span>'+S+'</span>'+
     '<span>Esplorazioni</span><span>'+a.expl+' su '+a.moves+' passi</span>'+
+    '<span>Ultimo viaggio</span><span>'+({car:'in auto',pt:'con i mezzi pubblici',walk:'a piedi o in bici'}[a.mode]||'–')+'</span>'+
+    '<span>Lavoro o scuola</span><span>'+(a.work?'sì, '+Math.round(Math.hypot(a.locs[1].x-a.locs[0].x,a.locs[1].y-a.locs[0].y))+' km da casa':'no')+'</span>'+
     '<span>Voli presi</span><span>'+a.flights+(a.airH?' · '+fmtH(a.airH)+' in volo':'')+'</span>'+
     '<span>Carburante al giorno</span><span>'+(days>0.5?(a.fuel/days).toLocaleString('it-IT',{maximumFractionDigits:2})+' L':'–')+'</span>'+
     '<span>CO₂ al giorno</span><span>'+(days>0.5?(co2Of(a.fuel-(a.fuelAir||0),a.fuelAir||0)/days).toLocaleString('it-IT',{maximumFractionDigits:2})+' kg':'–')+'</span>'+
@@ -1512,7 +1926,7 @@ function drawCharts(){
   const mu=slope(Sser.filter(p=>p[0]>=t/2));
   $('m-mu').textContent=isFinite(mu)?mu.toFixed(2)+' (atteso '+(1/(1+P.gamma)).toFixed(2)+')':'–';
   let st=[];if(Sser.length){const last=Sser[Sser.length-1],m=1/(1+P.gamma);st=sp.map(p=>[p[0],last[1]*Math.pow(p[0]/last[0],m)]);}
-  loglog($('c-s'),{xmin:1,xmax:WARMUP+T_MAX,series:[{pts:st,color:C.hot,kind:'line',dash:true},{pts:sp,color:C.amber,kind:'line'}]});
+  loglog($('c-s'),{xmin:1,xmax:Math.max(WARMUP+T_MAX,Math.pow(10,Math.ceil(Math.log10(Math.max(t,10))))),series:[{pts:st,color:C.hot,kind:'line',dash:true},{pts:sp,color:C.amber,kind:'line'}]});
 }
 
 /* ---------- controlli ---------- */
@@ -1526,8 +1940,8 @@ function fmtSpeed(v){
 const fmtL=v=>v>=1e9?(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' miliardi di L':v>=1e6?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni di L':v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' L';
 const fmtPop=v=>v>=1e6?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni':Math.round(v/1000).toLocaleString('it-IT')+' mila';
 // livelli della mappa attivabili con i pulsanti
-const SHOW={dens:false,pump:true,pp:true};
-for(const [id,key] of [['show-dens','dens'],['show-pump','pump'],['show-pp','pp']])
+const SHOW={dens:false,pump:true,pp:true,heat:false,traf:false};
+for(const [id,key] of [['show-dens','dens'],['show-pump','pump'],['show-pp','pp'],['show-heat','heat'],['show-traf','traf']])
   $(id).addEventListener('click',()=>{SHOW[key]=!SHOW[key];$(id).setAttribute('aria-pressed',SHOW[key]?'true':'false');});
 
 /* ---------- densità di persone ----------
@@ -1535,7 +1949,8 @@ for(const [id,key] of [['show-dens','dens'],['show-pump','pump'],['show-pp','pp'
    con una media mobile sugli ultimi ~50 passi (giorno e notte insieme), poi si riporta alla popolazione reale:
    densità = persone medie nella cella × persone rappresentate da ogni puntino ÷ area della cella in km² */
 const DG=25;let DENS=new Float32Array(DG*DG),topDens=null;
-function densReset(){DENS=new Float32Array(DG*DG);topDens=null;}
+function densReset(){DENS=new Float32Array(DG*DG);topDens=null;HEAT=new Float64Array(DG*DG);}
+let HEAT=new Float64Array(DG*DG);   // kWh di calore rilasciato in ogni quadrato (persone simulate)
 const cellKm=()=>WORLD/DG;
 function densUpdate(ds){
   if(ds<=0)return;
@@ -1654,6 +2069,95 @@ function updateZones(){
 const CO2_CAR=2.35,CO2_AIR=2.52;
 const co2Of=(lCar,lAir)=>lCar*CO2_CAR+lAir*CO2_AIR;
 const fmtKg=v=>v<1000?v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' kg':v<1e6?(v/1000).toLocaleString('it-IT',{maximumFractionDigits:1})+' t':v<1e9?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' mila t':(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' milioni di t';
+/* ---------- dato reale: Climate TRACE (API pubblica e gratuita, senza chiave) ----------
+   emissioni di CO₂ del trasporto su strada per la città (o la regione) della mappa, in tonnellate all'anno.
+   per non sovraccaricare l'API: al massimo un controllo ogni 12 ore per mappa, salvato nel browser,
+   poche richieste in fila e un tempo massimo di 10 secondi per richiesta. */
+const CT_API='https://api.climatetrace.org/v7',CT_EVERY=12*3600*1000,CT_TIMEOUT=10000;
+const CTDATA={},realBusy={};
+function ctLoad(key){try{const v=localStorage.getItem('ct_'+key);return v?JSON.parse(v):null;}catch(e){return null;}}
+function ctSave(key,v){try{localStorage.setItem('ct_'+key,JSON.stringify(v));}catch(e){}}
+async function ctGet(path){
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),CT_TIMEOUT);
+  try{const r=await fetch(CT_API+path,{signal:ctl.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
+  finally{clearTimeout(tm);}
+}
+const ctList=d=>Array.isArray(d)?d:(d&&(d.data||d.results||d.cities||d.admins||d.items))||[];
+const ctId=o=>o&&(o.id||o.cityId||o.city_id||o.gadmId||o.gadm_id);
+// cerca un campo numerico di popolazione nella risposta, a qualunque livello
+function findPop(o,depth){depth=depth||0;if(!o||typeof o!=='object'||depth>4)return 0;
+  for(const [k,v] of Object.entries(o)){if(/pop/i.test(k)&&typeof v==='number'&&v>1000)return v;if(/pop/i.test(k)&&typeof v==='string'&&+v>1000)return +v;}
+  for(const v of Object.values(o)){const r=findPop(v,depth+1);if(r)return r;}return 0;}
+const ctQty=d=>{const s=d&&d.totals&&d.totals.summaries;return s&&s.length?Number(s[0].emissionsQuantity)||0:0;};
+async function realFetch(key,force){
+  const def=MAPDEFS[key].ct;if(!def||realBusy[key])return;
+  const old=ctLoad(key);
+  if(old&&!force&&old.at&&Date.now()-old.at<CT_EVERY){CTDATA[key]=old;return;}
+  // dopo un errore si riprova al massimo una volta all'ora
+  if(old&&!force&&old.failAt&&Date.now()-old.failAt<3600*1000){CTDATA[key]=old;return;}
+  realBusy[key]=true;CTDATA[key]=Object.assign({},old||{},{status:'Aggiornamento del dato reale…'});
+  try{
+    let id=old&&old.id,area=old&&old.area;
+    if(!id){
+      const q=def.type==='city'?'/cities?name='+encodeURIComponent(def.name)+'&country='+def.country+'&limit=1':'/admins?name='+encodeURIComponent(def.name)+'&level='+def.level+'&limit=1';
+      const hit=ctList(await ctGet(q))[0];id=ctId(hit);area=(hit&&(hit.name||hit.fullName))||def.name;
+      if(!id)throw new Error('area non trovata');
+    }
+    const y0=new Date().getFullYear()-1;let t=0,year=y0;
+    for(year=y0;year>=y0-2&&!t;year--){
+      t=ctQty(await ctGet('/sources/emissions?year='+year+'&gas=co2&subsectors=road-transportation&'+(def.type==='city'?'cityId=':'gadmId=')+encodeURIComponent(id)));
+      if(t)break;
+    }
+    if(!t)throw new Error('nessun dato');
+    let pop=old&&old.pop,popSrc=old&&old.popSrc;
+    if(!pop){try{const det=await ctGet((def.type==='city'?'/cities/':'/admins/')+encodeURIComponent(id));pop=findPop(det);if(pop)popSrc='Climate TRACE';}catch(e){}}
+    CTDATA[key]={at:Date.now(),id,area,year,t,pop,popSrc,status:''};ctSave(key,CTDATA[key]);
+  }catch(e){
+    const why=e.name==='AbortError'?'tempo scaduto':e instanceof TypeError?'connessione non riuscita':(e.message||'errore');
+    CTDATA[key]=Object.assign({},old||{},{failAt:Date.now(),status:'Dato reale non raggiungibile ('+why+')'+(old&&old.t?': mostro l\'ultimo valore salvato.':'; riprovo tra un\'ora.')});
+    ctSave(key,CTDATA[key]);
+  }finally{realBusy[key]=false;}
+}
+// controllo periodico: ogni ora si guarda se il dato della mappa attiva ha più di 12 ore
+setInterval(()=>{if(MAP)realFetch(curMap,false);},3600*1000);
+/* ---------- taratura sul dato reale ----------
+   fattore f tale che (auto grezza × f + mezzi pubblici + voli) per persona = valore atteso per le persone.
+   si salva nel browser per ogni mappa. */
+const PEOPLE_SHARE=0.7;
+function calibLoad(key){try{const v=+localStorage.getItem('calib_'+key);return v>0?v:1;}catch(e){return 1;}}
+function calibSave(key,v){try{if(v===1)localStorage.removeItem('calib_'+key);else localStorage.setItem('calib_'+key,String(v));}catch(e){}}
+/* taratura automatica: quando c'è il dato reale e sono passati 20 giorni simulati, la simulazione si tara da sola,
+   una volta per ogni valore del dato reale (si ripete solo quando Climate TRACE pubblica un dato nuovo) */
+let calibAuto=(()=>{try{return localStorage.getItem('calib_auto')!=='0';}catch(e){return true;}})();
+const calibRef=key=>{try{return +localStorage.getItem('calibref_'+key)||0;}catch(e){return 0;}};
+function calibAutoCheck(){
+  const R=CTDATA[curMap];
+  if(calibAuto&&R&&R.t&&days>=20&&calibRef(curMap)!==R.t)calibrate();
+}
+function calibrate(){
+  const R=CTDATA[curMap];if(!R||!R.t||days<20)return;
+  try{localStorage.setItem('calibref_'+curMap,String(R.t));}catch(e){}
+  const md=MAPDEFS[curMap],pop=R.pop||md.ctPop,expPC=R.t/pop*PEOPLE_SHARE*1000;   // kg/anno
+  const n=Math.max(1,agents.length),perYear=365/days/n;
+  const carRaw=carRawL*CO2_CAR*perYear,other=(fuelPT*CO2_CAR+fuelAir*CO2_AIR)*perYear;
+  if(carRaw<=0)return;
+  const f=Math.max(0.3,Math.min(3,(expPC-other)/carRaw));
+  CALF=+f.toFixed(3);calibSave(curMap,CALF);reset();updateWho();
+}
+// il pulsante sta fuori dal riquadro che viene ridisegnato, così il clic non si perde
+$('calib-btn').addEventListener('click',()=>{
+  if(CALF!==1){
+    // togliere la taratura a mano spegne anche quella automatica, altrimenti tornerebbe dopo 20 giorni
+    CALF=1;calibSave(curMap,1);calibAuto=false;try{localStorage.setItem('calib_auto','0');}catch(e){}
+    $('calib-auto').checked=false;reset();updateWho();
+  }else calibrate();
+  updateCO2();
+});
+$('calib-auto').checked=calibAuto;
+$('calib-auto').addEventListener('change',()=>{
+  calibAuto=$('calib-auto').checked;try{localStorage.setItem('calib_auto',calibAuto?'1':'0');}catch(e){}
+  if(calibAuto){try{localStorage.removeItem('calibref_'+curMap);}catch(e){}calibAutoCheck();}
+});
 function updateCO2(){
   const dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale();
   const tot=co2Of(fuel-fuelAir,fuelAir),air=co2Of(0,fuelAir),ratio=fuel>0?tot/fuel:CO2_CAR;
@@ -1665,11 +2169,41 @@ function updateCO2(){
     '<span>Al giorno</span><span>'+(days>0.5?fmtKg(tot/dd*k):'–')+'</span>'+
     '<span>Per persona al giorno</span><span>'+(days>0.5?ppd.toLocaleString('it-IT',{maximumFractionDigits:2})+' kg':'–')+'</span>'+
     '<span>Per persona all\'anno</span><span>'+(days>0.5?(ppd*365/1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' t':'–')+'</span>';
+  // confronto con il dato reale
+  const R=CTDATA[curMap],sim=days>0.5?tot/dd*k/86400:0;
+  let h='<div class="grp">Dato reale (Climate TRACE)</div>';
+  if(R&&R.t){
+    const real=R.t*1000/31536000;
+    h+='<span>Trasporto su strada, '+R.year+'</span><span>'+fmtKg(real)+'/s</span>'+
+       '<span>Area</span><span style="white-space:normal;max-width:60%;justify-self:end">'+String(R.area).replace(/[<>&]/g,'')+'</span>'+
+       '<span>Simulazione / reale</span><span>'+(sim>0?(sim/real*100).toLocaleString('it-IT',{maximumFractionDigits:0})+'%':'–')+'</span>';
+    // confronto per persona: il dato reale diviso la popolazione dell'area, la quota delle persone (auto) è circa il 70%
+    const md=MAPDEFS[curMap],pop=R.pop||md.ctPop,realPC=R.t/pop,expPC=realPC*PEOPLE_SHARE;
+    const simPC=days>0.5?tot/dd/n*365/1000:0,ratio=simPC>0?simPC/expPC:0;
+    h+='<div class="grp">Confronto per persona</div>'+
+       '<span>Popolazione dell\'area</span><span>'+fmtPop(pop)+(R.pop?'':' (stima)')+'</span>'+
+       '<span>Reale, tutti i veicoli</span><span>'+realPC.toLocaleString('it-IT',{maximumFractionDigits:2})+' t/anno</span>'+
+       '<span>Attesa per le persone ('+Math.round(PEOPLE_SHARE*100)+'%)</span><span>'+expPC.toLocaleString('it-IT',{maximumFractionDigits:2})+' t/anno</span>'+
+       '<span>Simulazione</span><span>'+(simPC>0?simPC.toLocaleString('it-IT',{maximumFractionDigits:2})+' t/anno':'–')+'</span>'+
+       '<span>Simulazione / attesa</span><span>'+(ratio>0?(ratio*100).toLocaleString('it-IT',{maximumFractionDigits:0})+'%':'–')+'</span>'+
+       '<span>Taratura</span><span>'+(CALF!==1?'attiva, auto ×'+CALF.toLocaleString('it-IT',{maximumFractionDigits:2}):'non attiva')+'</span>';
+    h+='<span>Aggiornato</span><span>'+new Date(R.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>';
+  }
+  h+='<p class="fuelnote" style="grid-column:1/-1;margin-top:4px">'+(R&&R.status?R.status+' ':'')+'Il dato reale comprende tutto il traffico stradale (auto, moto, furgoni, camion, autobus) dell\'area urbana di Climate TRACE, che non coincide con la mappa: per questo il confronto giusto è per persona. Gli spostamenti delle persone valgono circa il '+Math.round(PEOPLE_SHARE*100)+'% delle emissioni stradali (le auto pesano tra il 58 e il 78%). La taratura moltiplica i consumi in auto per un fattore che porta la simulazione al valore atteso, e riavvia la simulazione. Con la taratura automatica avviene da sola dopo 20 giorni simulati, e si ripete solo quando arriva un dato reale nuovo. Il dato si aggiorna al massimo ogni 12 ore.</p>';
+  $('co2-real').innerHTML=h;
+  // stato del pulsante di taratura: aggiornato senza ricrearlo
+  const box=$('calib-box'),btn=$('calib-btn'),has=!!(R&&R.t);
+  box.style.display=has?'flex':'none';
+  if(has)calibAutoCheck();
+  if(has){const txt=CALF!==1?'Rimuovi la taratura':(days<20?(calibAuto?'Taratura automatica tra ':'Tara la simulazione (tra ')+Math.ceil(20-days)+' giorni simulati'+(calibAuto?'':')'):'Tara la simulazione su questo dato');
+    if(btn.textContent!==txt)btn.textContent=txt;btn.disabled=CALF===1&&days<20;}
 }
 /* ---------- energia: litri × contenuto energetico del carburante ----------
    1 kWh = 3,6 MJ; benzina/gasolio: 32 MJ/l ≈ 8,9 kWh/l (lo stesso valore usato per il dislivello);
    carburante per aerei: circa 34,7 MJ/l ≈ 9,6 kWh/l. il motore trasforma in lavoro alle ruote solo il rendimento η (25%). */
 const KWH_CAR=E_L/3.6e6,KWH_AIR=34.7e6/3.6e6;
+// joule con i prefissi del Sistema Internazionale: kJ 10³, MJ 10⁶, GJ 10⁹, TJ 10¹², PJ 10¹⁵
+const fmtJ=v=>{const u=[[1e15,'PJ'],[1e12,'TJ'],[1e9,'GJ'],[1e6,'MJ'],[1e3,'kJ']];for(const [f,n] of u)if(v>=f)return (v/f).toLocaleString('it-IT',{maximumFractionDigits:v/f<10?2:1})+' '+n;return v.toLocaleString('it-IT',{maximumFractionDigits:0})+' J';};
 const fmtKWh=v=>v<1e3?v.toLocaleString('it-IT',{maximumFractionDigits:v<10?2:0})+' kWh':v<1e6?(v/1e3).toLocaleString('it-IT',{maximumFractionDigits:1})+' MWh':v<1e9?(v/1e6).toLocaleString('it-IT',{maximumFractionDigits:2})+' GWh':(v/1e9).toLocaleString('it-IT',{maximumFractionDigits:2})+' TWh';
 function updateEnergy(){
   const dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale(),ok=days>0.5;
@@ -1686,9 +2220,51 @@ function updateEnergy(){
     row('Lavoro utile alle ruote ('+ETA*100+'%)',ok?fmtKWh(eCar*ETA/dd*k)+' al giorno':'–')+
     row('Persa in calore',ok?fmtKWh(eCar*(1-ETA)/dd*k)+' al giorno':'–')+
     row('Per il dislivello, totale',fuel>0?(fuelElev>=0?'+':'−')+fmtKWh(Math.abs(fuelElev)*KWH_CAR*k):'–')+
-    (CANFLY?row('Per i voli, totale',fmtKWh(eAir*k)):'');
+    (CANFLY?row('Per i voli, totale',fmtKWh(eAir*k)):'')+
+    // le stesse grandezze in joule: 1 kWh = 3,6 milioni di J; 1 J/s = 1 W
+    grp('In joule (1 kWh = 3,6 MJ)')+
+    row('Totale',fmtJ(tot*k*3.6e6))+
+    row('Al giorno',ok?fmtJ(perDay*3.6e6):'–')+
+    row('Ogni secondo',ok?fmtJ(perDay*3.6e6/86400)+'/s':'–')+
+    row('Lavoro utile alle ruote',ok?fmtJ(eCar*ETA/dd*k*3.6e6)+' al giorno':'–')+
+    row('Persa in calore',ok?fmtJ(eCar*(1-ETA)/dd*k*3.6e6)+' al giorno':'–')+
+    row('Per persona al giorno',ok?fmtJ(tot/dd/n*3.6e6):'–');
   $('kwh-note').innerHTML='<ul><li>Energia = litri × contenuto energetico: '+KWH_CAR.toLocaleString('it-IT',{maximumFractionDigits:1})+' kWh per litro di carburante per auto (32 MJ/l ÷ 3,6 MJ/kWh)'+(CANFLY?', '+KWH_AIR.toLocaleString('it-IT',{maximumFractionDigits:1})+' kWh per litro di carburante per aerei':'')+'.</li><li>Il numero in grande sono i kWh consumati in un\'ora reale da tutta la popolazione, cioè la potenza media.</li><li>Solo il '+ETA*100+'% dell\'energia dell\'auto diventa movimento; il resto si disperde in calore.</li></ul>';
 }
+/* ---------- effetto locale del calore ----------
+   tutta l'energia del carburante bruciato su strada diventa calore (motore, attriti, freni) nel punto in cui si guida.
+   flusso di calore q = energia al giorno ÷ 86.400 s ÷ area (W/m²).
+   aumento di temperatura della superficie, senza vento: ΔT ≈ q ÷ λ, dove λ ≈ 18 W/(m²·K) somma
+   l'irraggiamento (4σT³ ≈ 5,5 W/(m²·K) a 15 °C) e la convezione dell'aria (circa 12 W/(m²·K)).
+   il vento rimescola l'aria e porta via il calore, quindi il valore reale è più basso: è un limite superiore. */
+const SOLAR=240,LAMBDA=18;
+let heatTop=null;
+function heatFlux(c){const area=cellKm()*cellKm()*1e6;return days>0.5?HEAT[c]*popScale()/days/24*1000/area:0;}
+function updateHeat(){
+  if(days<0.5){$('heat-rate').textContent='– W/m²';$('heat').innerHTML='';$('heat-note').textContent='In attesa del primo giorno simulato…';heatTop=null;return;}
+  const k=popScale(),areaMap=WORLD*WORLD*1e6;let tot=0;for(let c=0;c<HEAT.length;c++)tot+=HEAT[c];
+  const qMap=tot*k/days/24*1000/areaMap;
+  // quadrati più caldi, con un nome
+  const cells=[];for(let j=0;j<DG;j++)for(let i=0;i<DG;i++){const q=heatFlux(j*DG+i);if(q>0)cells.push({i,j,q});}
+  cells.sort((a,b)=>b.q-a.q);
+  const c=cellKm();for(const z of cells.slice(0,3))z.name=townOf((z.i+0.5)*c,(z.j+0.5)*c)||'campagna';
+  heatTop=cells[0]||null;
+  const f2=v=>v.toLocaleString('it-IT',{maximumFractionDigits:v<0.1?3:2});
+  $('heat-rate').textContent=f2(qMap)+' W/m²';
+  const row=(l,v)=>'<span>'+l+'</span><span>'+v+'</span>',grp=t=>'<div class="grp">'+t+'</div>';
+  let h=row('Media sulla mappa',f2(qMap)+' W/m²')+
+    row('Rispetto al sole (240 W/m²)',f2(qMap/SOLAR*100)+'%')+
+    row('Riscaldamento medio',f2(qMap/LAMBDA)+' °C');
+  if(heatTop){
+    h+=grp('Quadrati più caldi ('+c.toFixed(1)+' × '+c.toFixed(1)+' km)');
+    for(const z of cells.slice(0,3))h+=row(z.name,f2(z.q)+' W/m² · +'+f2(z.q/LAMBDA)+' °C');
+  }
+  $('heat').innerHTML=h;
+  $('heat-note').innerHTML='<ul><li>Flusso di calore = energia del carburante bruciato su strada ÷ 86.400 s ÷ area. Il calore viene assegnato al quadrato in cui si trova ogni tratto di strada percorso.</li>'+
+    '<li>Aumento di temperatura senza vento: ΔT ≈ flusso ÷ '+LAMBDA+' W/(m²·K), cioè quanto deve scaldarsi la superficie per smaltire il calore in più, per irraggiamento e scambio con l\'aria. Con il vento il calore si disperde e l\'effetto reale è più piccolo: questi valori sono un limite superiore.</li>'+
+    '<li>Il calore dei voli è escluso, perché viene rilasciato in quota. Il livello "Calore" sulla mappa mostra i quadrati più caldi.</li></ul>';
+}
+const pctMode=m=>{const t=modeN.car+modeN.pt+modeN.walk;return t?(modeN[m]/t*100).toLocaleString('it-IT',{maximumFractionDigits:0})+'%':'–';};
 function updateFuel(){
   const md=MAPDEFS[curMap],dd=Math.max(days,1e-9),n=Math.max(1,agents.length),k=popScale();
   // consumo reale al secondo: litri al giorno simulato diviso gli 86.400 secondi di un giorno, non dipende dalla velocità dell'animazione
@@ -1700,14 +2276,20 @@ function updateFuel(){
     row('Totale',fmtL(fuel*k))+
     row('Al giorno',ok?fmtL(fuel/dd*k):'–')+
     row('Per persona al giorno',ok?(fuel/dd/n).toLocaleString('it-IT',{maximumFractionDigits:2})+' L':'–')+
+    grp('Mezzi e traffico')+
+    row('Viaggi in auto',pctMode('car'))+row('Con i mezzi pubblici',pctMode('pt'))+row('A piedi o in bici',pctMode('walk'))+
+    row('Carburante dei mezzi pubblici',ok?fmtL(fuelPT/dd*k)+' al giorno':'–')+
+    row('Carburante in più per il traffico',fuel>0?'+'+fmtL(fuelCong*k)+' ('+(fuelCong/Math.max(1e-9,fuel-fuelAir-fuelCong-fuelElev-fuelPT)*100).toLocaleString('it-IT',{maximumFractionDigits:1})+'%)':'–')+
+    row('Tempo in più nel traffico',trafD>0?'+'+((trafT/trafD-1)*100).toLocaleString('it-IT',{maximumFractionDigits:1})+'%':'–')+
     grp('Dislivello')+
     row('Carburante in più',fuel>0?(fuelElev>=0?'+':'−')+fmtL(Math.abs(fuelElev)*k):'–')+
     row('Sul consumo in auto',fuel>0?(pct>=0?'+':'')+pct.toLocaleString('it-IT',{maximumFractionDigits:1})+'%':'–')+
     row('Salita per persona al giorno',ok?Math.round(climbM/dd/n)+' m':'–')+
     (CANFLY?grp('Voli')+row('Carburante in volo',fmtL(fuelAir*k))+row('Ore di volo',fmtH(airH*k))+row('Ore di volo al giorno',ok?fmtH(airH*k/dd):'–'):'');
-  updateCO2();updateEnergy();
+  updateCO2();updateEnergy();updateHeat();
   $('fuel-note').innerHTML='<ul>'+
-    '<li>Auto in piano: '+md.l100.toLocaleString('it-IT')+' l/100 km a '+md.car+' km/h di media.</li>'+
+    '<li>Auto in piano: '+md.l100.toLocaleString('it-IT')+' l/100 km a '+md.car+' km/h di media; mezzi pubblici: '+PT_L.toLocaleString('it-IT')+' l per passeggero al km; a piedi o in bici: niente.</li>'+
+    '<li>Traffico: tempo di percorrenza con la funzione BPR, t = t₀ · (1 + 0,15 · (carico/capacità)⁴); la marcia a singhiozzo aumenta il consumo del 40% dell\'aumento di tempo. I percorsi non cambiano per evitare il traffico.</li>'+
     '<li>Salita: '+(K_UP*1000).toLocaleString('it-IT',{maximumFractionDigits:2})+' ml per metro (m·g / η·E, auto da '+CAR_KG+' kg, rendimento '+ETA*100+'%, 32 MJ/l); in discesa se ne recupera metà. Quote interpolate tra quote reali.</li>'+
     (CANFLY?'<li>Volo in '+md.airName+': '+md.airL.toLocaleString('it-IT')+' l per passeggero al km, a '+md.airKmh+' km/h.</li>':'')+
     '<li>Valori riferiti a tutta la popolazione. Il numero in grande è il consumo reale al secondo: litri al giorno ÷ 86.400 secondi, indipendente dalla velocità della simulazione.</li></ul>';
@@ -1715,7 +2297,7 @@ function updateFuel(){
 function updateTime(){
   const d=MAPDEFS[curMap],km2=d.world*d.world;
   $('o-speed').textContent=fmtSpeed(P.speed);
-  $('timeinfo').textContent='Mappa di '+d.world+' × '+d.world+' km ('+km2.toLocaleString('it-IT')+' km²). Un passo è uno spostamento in auto: in media '+d.tripRef.toFixed(1)+' km a '+d.car+' km/h, cioè '+Math.round(tripMin())+' minuti (media di riferimento su un ciclo completo; finora il viaggio medio misurato è '+tripKm().toFixed(1)+' km). Con circa '+DRIVE_MIN+' minuti di guida al giorno fanno '+stepsPerDay().toFixed(1)+' passi al giorno; l\'ultimo di ogni giornata riporta a casa per la notte ('+NIGHT_H+' ore). Prima di iniziare a contare, ogni ciclo fa '+WARMUP+' passi di riscaldamento, così le persone partono con abitudini già consolidate.';
+  $('timeinfo').textContent='Mappa di '+d.world+' × '+d.world+' km ('+km2.toLocaleString('it-IT')+' km²). Un passo è uno spostamento: per la scala del tempo si usa un viaggio di riferimento in auto di '+d.tripRef.toFixed(1)+' km a '+d.car+' km/h, cioè '+Math.round(tripMin())+' minuti (media misurata su una lunga simulazione; finora il viaggio medio misurato è '+tripKm().toFixed(1)+' km). Con circa '+DRIVE_MIN+' minuti di guida al giorno fanno '+stepsPerDay().toFixed(1)+' passi al giorno (almeno 3: lavoro o scuola, un\'altra sosta e il ritorno a casa); l\'ultimo di ogni giornata riporta a casa per la notte ('+NIGHT_H+' ore). Prima di iniziare a contare la simulazione fa '+WARMUP+' passi di riscaldamento, così le persone partono con abitudini già consolidate; poi va avanti senza fine, e ognuno ricorda al massimo '+LMAX+' luoghi, dimenticando quelli visitati meno.';
 }
 let resetTimer=null;
 function syncUI(){
@@ -1766,10 +2348,10 @@ function setMap(key){
   const d=MAPDEFS[key];
   WORLD=d.world;
   if(!MAPS[key])MAPS[key]=d.build();
-  MAP=MAPS[key];NODES=MAP.NODES;CANFLY=MAP.CANFLY;curMap=key;
+  MAP=MAPS[key];NODES=MAP.NODES;CANFLY=MAP.CANFLY;curMap=key;roadCapacity();CALF=calibLoad(key);
   $('title').textContent=d.title;$('desc').textContent=d.desc;document.title=d.title;
   document.querySelectorAll('.maps button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.map===key?'true':'false'));
-  sel=0;sizeMap();reset();updateWho();updatePop();
+  sel=0;sizeMap();reset();updateWho();realFetch(key,false);updatePop();
 }
 document.querySelectorAll('.maps button').forEach(b=>b.addEventListener('click',()=>{
   if(MAP===MAPS[b.dataset.map])return;
@@ -1782,5 +2364,6 @@ readColors();syncUI();setMap('ny');requestAnimationFrame(loop);
 
 </body>
 </html>
+
 
 
